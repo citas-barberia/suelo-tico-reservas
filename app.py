@@ -1360,4 +1360,7 @@ def desmarcar_sinpe_reportado_admin(reserva_id):
 if __name__ == "__main__":
     advertencias_seguridad_inicio()
     debug_mode = parse_bool_env(os.getenv("FLASK_DEBUG"), default=True)
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=debug_mode)
+    import os
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
