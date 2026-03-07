@@ -3,8 +3,9 @@ from io import StringIO
 from flask import Response, Flask, render_template, request, redirect, url_for, jsonify, session
 import json
 import os
-from datetime import datetime, date
+from datetime import datetime
 from urllib.parse import quote_plus
+from zoneinfo import ZoneInfo
 
 app = Flask(__name__)
 
@@ -41,6 +42,17 @@ HORARIOS = [
     "6pm", "7pm", "8pm", "9pm", "10pm"
 ]
 
+ZONA_CR = ZoneInfo("America/Costa_Rica")
+
+
+def ahora_cr():
+    return datetime.now(ZONA_CR)
+
+
+def hoy_cr_iso():
+    return ahora_cr().date().isoformat()
+
+
 # ==========================
 # UTILIDADES JSON
 # ==========================
@@ -56,14 +68,17 @@ def leer_json_lista(path):
         except json.JSONDecodeError:
             return []
 
+
 def guardar_json_lista(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
 
 def siguiente_id(lista):
     if not lista:
         return 1
     return max(int(x.get("id", 0)) for x in lista) + 1
+
 
 # ==========================
 # RESERVAS
@@ -83,16 +98,20 @@ def leer_reservas():
             r["origen"] = "Reserva"
     return reservas
 
+
 def guardar_reservas(reservas):
     guardar_json_lista(ARCHIVO_RESERVAS, reservas)
+
 
 def leer_eventos():
     eventos = leer_json_lista(ARCHIVO_EVENTOS)
     eventos.sort(key=lambda e: e.get("fecha_evento", ""), reverse=True)
     return eventos
 
+
 def guardar_eventos(eventos):
     guardar_json_lista(ARCHIVO_EVENTOS, eventos)
+
 
 def formatear_fecha_latina(fecha_iso):
     try:
@@ -101,8 +120,10 @@ def formatear_fecha_latina(fecha_iso):
     except Exception:
         return fecha_iso
 
+
 def fecha_hoy_iso():
-    return date.today().isoformat()
+    return hoy_cr_iso()
+
 
 def parse_fecha_segura(fecha_iso):
     try:
@@ -110,52 +131,62 @@ def parse_fecha_segura(fecha_iso):
     except Exception:
         return None
 
+
 def es_fecha_pasada(fecha_iso):
     try:
         fecha_reserva = datetime.strptime(fecha_iso, "%Y-%m-%d").date()
-        return fecha_reserva < date.today()
+        return fecha_reserva < ahora_cr().date()
     except ValueError:
         return True
+
 
 def hora_a_orden(hora_texto):
     if not hora_texto:
         return 9999
+
     h = str(hora_texto).strip().lower().replace(" ", "")
     h = h.replace(":00", "")
+
     try:
         if h.endswith("am") or h.endswith("pm"):
             sufijo = h[-2:]
             numero = int(h[:-2])
+
             if sufijo == "am":
                 return 0 if numero == 12 else numero
-            else:
-                return 12 if numero == 12 else numero + 12
+            return 12 if numero == 12 else numero + 12
     except Exception:
         pass
+
     return 9999
+
 
 def hora_ya_paso_para_hoy(fecha_iso, hora_texto):
     try:
-        if fecha_iso != date.today().isoformat():
+        if fecha_iso != hoy_cr_iso():
             return False
+
         orden = hora_a_orden(hora_texto)
         if orden == 9999:
             return True
-        ahora = datetime.now()
-        inicio_slot = ahora.replace(hour=orden, minute=0, second=0, microsecond=0)
-        return ahora >= inicio_slot
+
+        ahora = ahora_cr()
+        return ahora.hour >= orden
     except Exception:
         return True
+
 
 def obtener_precio_por_hora(hora):
     h = str(hora).strip().lower()
     horario_20000 = {"9am", "10am", "11am", "12pm", "1pm", "2pm", "3pm", "4pm", "5pm"}
     horario_25000 = {"6pm", "7pm", "8pm", "9pm", "10pm"}
+
     if h in horario_20000:
         return 20000
     if h in horario_25000:
         return 25000
     return 25000
+
 
 # ==========================
 # RETOS
@@ -173,8 +204,10 @@ def leer_retos():
             r["descripcion"] = ""
     return retos
 
+
 def guardar_retos(retos):
     guardar_json_lista(ARCHIVO_RETOS, retos)
+
 
 def leer_solicitudes_retos():
     sol = leer_json_lista(ARCHIVO_SOLICITUDES_RETOS)
@@ -187,11 +220,14 @@ def leer_solicitudes_retos():
             s["tipo"] = "Publicado"
     return sol
 
+
 def guardar_solicitudes_retos(sol):
     guardar_json_lista(ARCHIVO_SOLICITUDES_RETOS, sol)
 
+
 def normalizar_tel(tel):
     return "".join(ch for ch in str(tel) if ch.isdigit())
+
 
 def tel_a_wa(tel):
     dig = normalizar_tel(tel)
@@ -199,35 +235,44 @@ def tel_a_wa(tel):
         return "506" + dig
     return dig
 
+
 def wa_link(tel, texto):
     return f"https://wa.me/{tel_a_wa(tel)}?text={quote_plus(texto)}"
+
 
 def reto_ya_paso(fecha_iso, hora_texto):
     f = parse_fecha_segura(fecha_iso)
     if not f:
         return True
-    hoy = date.today()
+
+    hoy = ahora_cr().date()
+
     if f < hoy:
         return True
     if f > hoy:
         return False
+
     orden = hora_a_orden(hora_texto)
     if orden == 9999:
         return True
-    ahora = datetime.now()
-    inicio = ahora.replace(hour=orden, minute=0, second=0, microsecond=0)
-    return ahora >= inicio
+
+    ahora = ahora_cr()
+    return ahora.hour >= orden
+
 
 def autocerrar_retos():
     retos = leer_retos()
     cambio = False
+
     for r in retos:
         if r.get("estado") == "Activo" and reto_ya_paso(r.get("fecha", ""), r.get("hora", "")):
             r["estado"] = "Cerrado"
-            r["fecha_cierre_auto"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            r["fecha_cierre_auto"] = ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
             cambio = True
+
     if cambio:
         guardar_retos(retos)
+
 
 # ==========================
 # DISPONIBILIDAD COMPARTIDA
@@ -244,8 +289,10 @@ def reto_ocupa_slot(fecha, cancha_id, hora):
             return True
     return False
 
+
 def horario_ocupado(fecha, cancha_id, hora):
     reservas = leer_reservas()
+
     for r in reservas:
         if (
             r.get("fecha") == fecha
@@ -259,6 +306,7 @@ def horario_ocupado(fecha, cancha_id, hora):
         return True
 
     return False
+
 
 def obtener_horas_ocupadas(fecha, cancha_id):
     ocupadas = set()
@@ -283,6 +331,7 @@ def obtener_horas_ocupadas(fecha, cancha_id):
 
     return list(ocupadas)
 
+
 def obtener_horas_disponibles(fecha, cancha_id):
     if not fecha:
         return HORARIOS[:]
@@ -295,15 +344,19 @@ def obtener_horas_disponibles(fecha, cancha_id):
     ocupadas = set(h.lower() for h in obtener_horas_ocupadas(fecha, cancha_id))
     return [h for h in horarios_base if h.lower() not in ocupadas]
 
+
 def _filtrar_reservas(reservas, fecha_filtro="", cancha_filtro="", busqueda=""):
     resultado = reservas[:]
+
     if fecha_filtro:
         resultado = [r for r in resultado if r.get("fecha") == fecha_filtro]
+
     if cancha_filtro:
         try:
             resultado = [r for r in resultado if int(r.get("cancha_id", 0)) == int(cancha_filtro)]
         except ValueError:
             pass
+
     if busqueda:
         q = busqueda.strip().lower()
         resultado = [
@@ -311,11 +364,13 @@ def _filtrar_reservas(reservas, fecha_filtro="", cancha_filtro="", busqueda=""):
             if q in str(r.get("nombre", "")).lower()
             or q in str(r.get("telefono", "")).lower()
         ]
+
     return resultado
+
 
 def registrar_evento(tipo, reserva):
     eventos = leer_json_lista(ARCHIVO_EVENTOS)
-    ahora = datetime.now()
+    ahora = ahora_cr()
 
     if tipo == "reserva":
         mensaje = (
@@ -351,6 +406,7 @@ def registrar_evento(tipo, reserva):
     eventos.append(evento)
     guardar_eventos(eventos)
 
+
 def crear_reserva_desde_reto(fecha, hora, cancha_id, nombre, telefono, metodo_pago, monto, nota, origen="Reto", reto_id=None):
     if horario_ocupado(fecha, cancha_id, hora):
         return None, "Esa hora ya está ocupada en esa cancha."
@@ -374,10 +430,11 @@ def crear_reserva_desde_reto(fecha, hora, cancha_id, nombre, telefono, metodo_pa
         "pagado": False,
         "sinpe_reportado_cliente": False,
         "estado": "Reservada",
-        "fecha_creacion": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "fecha_creacion": ahora_cr().strftime("%Y-%m-%d %H:%M:%S"),
         "origen": origen,
         "nota_reto": nota or ""
     }
+
     if reto_id is not None:
         nueva["reto_id"] = int(reto_id)
 
@@ -386,15 +443,18 @@ def crear_reserva_desde_reto(fecha, hora, cancha_id, nombre, telefono, metodo_pa
     registrar_evento("reserva", nueva)
     return nueva, ""
 
+
 # ==========================
 # AUTH ADMIN
 # ==========================
 def admin_requerido():
     return session.get("admin_logueado") is True
 
+
 def parse_bool_env(value, default=False):
     if value is None:
         return default
+
     v = str(value).strip().lower()
     if v in {"1", "true", "t", "yes", "y", "on"}:
         return True
@@ -402,11 +462,13 @@ def parse_bool_env(value, default=False):
         return False
     return default
 
+
 def advertencias_seguridad_inicio():
     if app.secret_key == "dev-secret-cambiar-antes-de-produccion":
         print("⚠️ ADVERTENCIA: APP_SECRET_KEY por defecto (solo desarrollo).")
     if ADMIN_USUARIO == "admin" and ADMIN_PASSWORD == "1234":
         print("⚠️ ADVERTENCIA: ADMIN_USUARIO / ADMIN_PASSWORD por defecto.")
+
 
 # ==========================
 # FILTROS JINJA
@@ -414,6 +476,7 @@ def advertencias_seguridad_inicio():
 @app.template_filter("fecha_latina")
 def fecha_latina_filter(fecha_iso):
     return formatear_fecha_latina(fecha_iso)
+
 
 @app.template_filter("colones")
 def colones_filter(monto):
@@ -423,16 +486,18 @@ def colones_filter(monto):
     except Exception:
         return f"₡{monto}"
 
+
 @app.template_filter("fecha_larga")
 def fecha_larga_filter(fecha_iso):
     try:
         dt = datetime.strptime(fecha_iso, "%Y-%m-%d")
-        dias = ["lunes","martes","miércoles","jueves","viernes","sábado","domingo"]
-        meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
+        dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+        meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
         dia_sem = dias[dt.weekday()]
-        return f"{dia_sem} {dt.day} de {meses[dt.month-1]}"
+        return f"{dia_sem} {dt.day} de {meses[dt.month - 1]}"
     except Exception:
         return fecha_iso
+
 
 # ==========================
 # CLIENTE: RESERVAS
@@ -482,11 +547,13 @@ def index():
         else:
             reservas = leer_reservas()
             cancha_info = next((c for c in CANCHAS if c["id"] == int(cancha_id)), None)
+
             if not cancha_info:
                 mensaje = "La cancha seleccionada no es válida."
                 tipo_mensaje = "error"
             else:
                 monto = obtener_precio_por_hora(hora)
+
                 nueva = {
                     "id": (max([int(r.get("id", 0)) for r in reservas], default=0) + 1),
                     "nombre": nombre,
@@ -501,9 +568,10 @@ def index():
                     "pagado": False,
                     "sinpe_reportado_cliente": False,
                     "estado": "Reservada",
-                    "fecha_creacion": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "fecha_creacion": ahora_cr().strftime("%Y-%m-%d %H:%M:%S"),
                     "origen": "Reserva"
                 }
+
                 reservas.append(nueva)
                 guardar_reservas(reservas)
                 registrar_evento("reserva", nueva)
@@ -512,7 +580,6 @@ def index():
                 tipo_mensaje = "success"
                 reserva_creada = nueva
 
-                # WhatsApp al cliente
                 msg_wa = (
                     "✅ Reserva confirmada\n"
                     f"Cancha Suelo Tico: {cancha_info['nombre']} ({cancha_info['tipo']})\n"
@@ -524,7 +591,6 @@ def index():
                 )
                 whatsapp_link = wa_link(telefono, msg_wa)
 
-                # WhatsApp al dueño (texto)
                 texto_confirm = (
                     "✅ Reserva confirmada\n"
                     f"Cancha: {nueva.get('cancha_nombre')} ({nueva.get('cancha_tipo')})\n"
@@ -556,6 +622,7 @@ def index():
         wa_confirm_text=texto_confirm if reserva_creada else ""
     )
 
+
 @app.route("/horarios_disponibles")
 def horarios_disponibles_api():
     fecha = request.args.get("fecha", "").strip()
@@ -572,6 +639,7 @@ def horarios_disponibles_api():
         return jsonify({"ok": True, "horarios": disponibles, "mensaje": ""})
     except Exception:
         return jsonify({"ok": False, "horarios": [], "mensaje": "No se pudieron cargar los horarios"}), 400
+
 
 @app.route("/horarios_disponibles_reto")
 def horarios_disponibles_reto_api():
@@ -590,6 +658,7 @@ def horarios_disponibles_reto_api():
     except Exception:
         return jsonify({"ok": False, "horarios": [], "mensaje": "No se pudieron cargar los horarios"}), 400
 
+
 # ==========================
 # CLIENTE: RETOS
 # ==========================
@@ -599,6 +668,7 @@ def retos_publicos():
     aviso = request.args.get("aviso", "").strip()
     retos = [r for r in leer_retos() if r.get("estado") == "Activo"]
     retos = sorted(retos, key=lambda r: (r.get("fecha", ""), hora_a_orden(r.get("hora", ""))))
+
     return render_template(
         "retos.html",
         retos=retos,
@@ -607,6 +677,7 @@ def retos_publicos():
         dueno_nombre=DUENO_NOMBRE,
         dueno_telefono=DUENO_TELEFONO
     )
+
 
 @app.route("/retos/solicitar/<int:reto_id>", methods=["POST"])
 def solicitar_reto_publicado(reto_id):
@@ -642,12 +713,13 @@ def solicitar_reto_publicado(reto_id):
         "nota": nota,
         "metodo_pago": metodo_pago,
         "estado": "Pendiente",
-        "fecha_creacion": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "fecha_creacion": ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
     }
     solicitudes.append(nueva)
     guardar_solicitudes_retos(solicitudes)
 
     return redirect(url_for("retos_publicos", aviso="✅ Solicitud enviada. El dueño la revisará."))
+
 
 @app.route("/retos/personalizado", methods=["POST"])
 def solicitar_reto_personalizado():
@@ -694,12 +766,13 @@ def solicitar_reto_personalizado():
         "metodo_pago": metodo_pago,
         "nota": nota,
         "estado": "Pendiente",
-        "fecha_creacion": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "fecha_creacion": ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
     }
     solicitudes.append(nueva)
     guardar_solicitudes_retos(solicitudes)
 
     return redirect(url_for("retos_publicos", aviso="✅ Solicitud de reto enviada. El dueño la revisará."))
+
 
 # ==========================
 # LOGIN ADMIN
@@ -723,10 +796,12 @@ def login_admin():
 
     return render_template("login.html", mensaje=mensaje)
 
+
 @app.route("/logout_admin")
 def logout_admin():
     session.clear()
     return redirect(url_for("login_admin"))
+
 
 # ==========================
 # ADMIN: OPERACIÓN
@@ -737,7 +812,7 @@ def admin():
         return redirect(url_for("login_admin"))
 
     reservas = leer_reservas()
-    hoy = date.today()
+    hoy = ahora_cr().date()
     hoy_iso = hoy.isoformat()
     aviso = request.args.get("aviso", "").strip()
 
@@ -745,14 +820,8 @@ def admin():
     reservas_dia_activas = [r for r in reservas_dia if r.get("estado") == "Reservada"]
     canceladas_dia = [r for r in reservas_dia if r.get("estado") == "Cancelada"]
 
-    reservas_dia_activas = sorted(
-        reservas_dia_activas,
-        key=lambda r: hora_a_orden(r.get("hora", ""))
-    )
-    canceladas_dia = sorted(
-        canceladas_dia,
-        key=lambda r: hora_a_orden(r.get("hora", ""))
-    )
+    reservas_dia_activas = sorted(reservas_dia_activas, key=lambda r: hora_a_orden(r.get("hora", "")))
+    canceladas_dia = sorted(canceladas_dia, key=lambda r: hora_a_orden(r.get("hora", "")))
 
     reservas_dia_pagadas = [r for r in reservas_dia_activas if r.get("pagado") is True]
     dinero_dia = sum(int(r.get("monto", 0)) for r in reservas_dia_pagadas)
@@ -762,7 +831,7 @@ def admin():
         h = hora_a_orden(hora_txt)
         if h < 12:
             return "mañana"
-        elif h < 18:
+        if h < 18:
             return "tarde"
         return "noche"
 
@@ -788,61 +857,8 @@ def admin():
             "fecha": hoy_iso
         }
     )
-    # ==========================
-    # BLOQUE RETOS
-    # ==========================
-    retos = leer_retos()
-    solicitudes = leer_solicitudes_retos()
 
-    retos = sorted(
-        retos,
-        key=lambda r: (r.get("fecha", ""), hora_a_orden(r.get("hora", "")))
-    )
 
-    solicitudes_publicadas = [s for s in solicitudes if s.get("tipo") == "Publicado"]
-    solicitudes_personalizadas = [s for s in solicitudes if s.get("tipo") == "Personalizado"]
-
-    solicitudes_por_reto = {}
-    for s in solicitudes_publicadas:
-        rid = int(s.get("reto_id", 0))
-        solicitudes_por_reto.setdefault(rid, []).append(s)
-
-    for rid, lista in solicitudes_por_reto.items():
-        lista.sort(
-            key=lambda x: (
-                0 if x.get("estado") == "Pendiente" else 1,
-                x.get("fecha_creacion", "")
-            )
-        )
-
-    solicitudes_personalizadas.sort(
-        key=lambda s: (
-            s.get("fecha", ""),
-            hora_a_orden(s.get("hora", "")),
-            s.get("fecha_creacion", "")
-        )
-    )
-
-    return render_template(
-        "admin.html",
-        admin_usuario=session.get("admin_usuario", "admin"),
-        aviso=aviso,
-        fecha_resumen=dia_consulta_iso,
-        hoy_real_iso=hoy_iso,
-
-        # operación
-        reservas_dia_activas=reservas_dia_activas,
-        canceladas_dia=canceladas_dia,
-        resumen_hoy=resumen_hoy,
-
-        # retos
-        retos=retos,
-        solicitudes_por_reto=solicitudes_por_reto,
-        solicitudes_personalizadas=solicitudes_personalizadas,
-
-        # extras
-        canchas=CANCHAS
-    )
 # ==========================
 # ADMIN: AGENDA
 # ==========================
@@ -852,7 +868,7 @@ def admin_agenda():
         return redirect(url_for("login_admin"))
 
     reservas = leer_reservas()
-    hoy = date.today()
+    hoy = ahora_cr().date()
     hoy_iso = hoy.isoformat()
 
     fecha_filtro = request.args.get("fecha", "").strip()
@@ -914,6 +930,7 @@ def admin_agenda():
         resumen_agenda=resumen_agenda
     )
 
+
 # ==========================
 # ADMIN: HISTORIAL
 # ==========================
@@ -923,7 +940,7 @@ def admin_historial():
         return redirect(url_for("login_admin"))
 
     reservas = leer_reservas()
-    hoy = date.today()
+    hoy = ahora_cr().date()
 
     desde_filtro = request.args.get("desde", "").strip()
     hasta_filtro = request.args.get("hasta", "").strip()
@@ -983,6 +1000,7 @@ def admin_historial():
         desde_filtro=desde_filtro,
         hasta_filtro=hasta_filtro
     )
+
 
 # ==========================
 # EXPORT CSV
@@ -1064,6 +1082,7 @@ def exportar_historial_csv():
         headers={"Content-Disposition": "attachment; filename=historial.csv"}
     )
 
+
 # ==========================
 # ADMIN: RETOS
 # ==========================
@@ -1103,6 +1122,7 @@ def admin_retos():
         canchas=CANCHAS
     )
 
+
 @app.route("/admin_retos/crear", methods=["POST"])
 def admin_crear_reto():
     if not admin_requerido():
@@ -1128,6 +1148,7 @@ def admin_crear_reto():
         precio_i = int(precio) if precio else 0
     except ValueError:
         precio_i = 0
+
     try:
         cupo_i = int(cupo) if cupo else 10
     except ValueError:
@@ -1149,12 +1170,13 @@ def admin_crear_reto():
         "cupo": cupo_i,
         "descripcion": descripcion,
         "estado": "Activo",
-        "fecha_creacion": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "fecha_creacion": ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
     }
     retos.append(nuevo)
     guardar_retos(retos)
 
     return redirect(url_for("admin_retos", aviso="✅ Reto creado."))
+
 
 @app.route("/admin_retos/cerrar/<int:reto_id>")
 def admin_cerrar_reto(reto_id):
@@ -1163,14 +1185,17 @@ def admin_cerrar_reto(reto_id):
 
     retos = leer_retos()
     aviso = "No se encontró el reto."
+
     for r in retos:
         if int(r.get("id", 0)) == reto_id:
             r["estado"] = "Cerrado"
-            r["fecha_cierre"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            r["fecha_cierre"] = ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
             aviso = "✅ Reto cerrado."
             break
+
     guardar_retos(retos)
     return redirect(url_for("admin_retos", aviso=aviso))
+
 
 @app.route("/admin_retos/solicitud/<int:sol_id>/<accion>")
 def admin_accion_solicitud(sol_id, accion):
@@ -1198,6 +1223,7 @@ def admin_accion_solicitud(sol_id, accion):
     if sol.get("tipo") == "Publicado":
         reto_id = int(sol.get("reto_id", 0))
         reto = next((r for r in retos if int(r.get("id", 0)) == reto_id), None)
+
         if not reto or reto.get("estado") != "Activo":
             return redirect(url_for("admin_retos", aviso="El reto ya no está activo."))
 
@@ -1213,12 +1239,13 @@ def admin_accion_solicitud(sol_id, accion):
             origen="Reto",
             reto_id=reto_id
         )
+
         if not reserva:
             return redirect(url_for("admin_retos", aviso=f"No se pudo crear la reserva del reto: {err}"))
 
         sol["estado"] = "Aceptada"
         reto["estado"] = "Cerrado"
-        reto["fecha_cierre"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        reto["fecha_cierre"] = ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
 
         for s in solicitudes:
             if s.get("tipo") == "Publicado" and int(s.get("reto_id", 0)) == reto_id and int(s.get("id", 0)) != sol_id:
@@ -1229,7 +1256,6 @@ def admin_accion_solicitud(sol_id, accion):
         guardar_retos(retos)
         return redirect(url_for("admin_retos", aviso="✅ Solicitud aceptada y reto convertido en reserva (con pagos)."))
 
-    # Personalizado
     fecha = sol.get("fecha")
     hora = sol.get("hora")
     cancha_id = sol.get("cancha_id")
@@ -1246,13 +1272,16 @@ def admin_accion_solicitud(sol_id, accion):
         nota=sol.get("nota", ""),
         origen="Reto"
     )
+
     if not reserva:
         return redirect(url_for("admin_retos", aviso=f"No se pudo crear la reserva del reto: {err}"))
 
     sol["estado"] = "Aceptada"
     sol["reserva_id"] = reserva.get("id")
     guardar_solicitudes_retos(solicitudes)
+
     return redirect(url_for("admin_retos", aviso="✅ Reto personalizado aceptado y creado como reserva (con pagos)."))
+
 
 # ==========================
 # ACCIONES ADMIN (PAGOS)
@@ -1273,11 +1302,11 @@ def confirmar_pago_admin(reserva_id):
             elif r.get("pagado") is True:
                 aviso = "Ese pago ya estaba confirmado."
             else:
-                if r.get("fecha") != date.today().isoformat():
+                if r.get("fecha") != hoy_cr_iso():
                     aviso = "El pago solo se puede confirmar el mismo día de la reserva."
                 else:
                     r["pagado"] = True
-                    r["fecha_pago_confirmado"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    r["fecha_pago_confirmado"] = ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
                     reserva_actualizada = r
                     aviso = "Pago confirmado correctamente."
             break
@@ -1299,6 +1328,7 @@ def confirmar_pago_admin(reserva_id):
 
     return redirect(url_for("admin", aviso=aviso))
 
+
 @app.route("/marcar_sinpe_reportado/<int:reserva_id>")
 def marcar_sinpe_reportado_admin(reserva_id):
     if not admin_requerido():
@@ -1315,7 +1345,7 @@ def marcar_sinpe_reportado_admin(reserva_id):
                 aviso = "Esta reserva no es por SINPE."
             else:
                 r["sinpe_reportado_cliente"] = True
-                r["fecha_sinpe_reportado"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                r["fecha_sinpe_reportado"] = ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
                 aviso = "SINPE reportado por cliente marcado correctamente."
             break
 
@@ -1328,6 +1358,7 @@ def marcar_sinpe_reportado_admin(reserva_id):
         cancha_id=request.args.get("cancha_id", "").strip(),
         q=request.args.get("q", "").strip()
     ))
+
 
 @app.route("/desmarcar_sinpe_reportado/<int:reserva_id>")
 def desmarcar_sinpe_reportado_admin(reserva_id):
@@ -1357,10 +1388,12 @@ def desmarcar_sinpe_reportado_admin(reserva_id):
         q=request.args.get("q", "").strip()
     ))
 
+
 if __name__ == "__main__":
     advertencias_seguridad_inicio()
     debug_mode = parse_bool_env(os.getenv("FLASK_DEBUG"), default=True)
-    import os
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 10000)),
+        debug=debug_mode
+    )
