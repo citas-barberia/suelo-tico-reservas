@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Suelo Tico · Admin · Retos</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body class="admin-body">
+  <div class="admin-shell">
+
+    <!-- SIDEBAR -->
+    <aside class="admin-sidebar">
+      <div class="brand">
+        <div class="brand-mark">ST</div>
+        <div class="brand-txt">
+          <div class="name">SUELO TICO</div>
+          <div class="sub">ADMIN PANEL</div>
+        </div>
+      </div>
+
+      {% set active_tab = 'retos' %}
+      {% include "_admin_tabs.html" with context %}
+
+      <div class="sidebar-footer">
+        <a class="admin-logout" href="{{ url_for('logout_admin') }}">Cerrar sesión</a>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="admin-main">
+
+      <!-- TOPBAR -->
+      <div class="admin-topbar">
+        <div class="search">
+          🔎 <input id="globalSearch" type="text" placeholder="Buscar… (visual)" />
+        </div>
+
+        <div class="top-actions">
+          <div class="icon-btn">🔔</div>
+          <div class="icon-btn">💬</div>
+
+          <div class="user-pill">
+            <div class="user-avatar">{{ (admin_usuario[:1] if admin_usuario else 'A')|upper }}</div>
+            <div class="user-meta">
+              <div class="u">{{ admin_usuario }}</div>
+              <div class="r">Administrador</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-head">
+        <h1>Retos y <span class="accent">Solicitudes</span></h1>
+        <p>Acepta solicitudes y se convierten en reservas con pago</p>
+      </div>
+
+      {% set retos_activos = (retos | selectattr("estado", "equalto", "Activo") | list) %}
+      {% set retos_cerrados = (retos | selectattr("estado", "equalto", "Cerrado") | list) %}
+
+      {% set ns = namespace(pend_pub=0) %}
+      {% for rid, lista_tmp in solicitudes_por_reto.items() %}
+        {% for s in lista_tmp %}
+          {% if s.estado == "Pendiente" %}
+            {% set ns.pend_pub = ns.pend_pub + 1 %}
+          {% endif %}
+        {% endfor %}
+      {% endfor %}
+
+      {% set pend_person = (solicitudes_personalizadas | selectattr("estado", "equalto", "Pendiente") | list) | length %}
+      {% set total_pendientes = ns.pend_pub + pend_person %}
+
+      {% set ns_acc = namespace(acc=0) %}
+      {% for rid, lista_tmp in solicitudes_por_reto.items() %}
+        {% for s in lista_tmp %}
+          {% if s.estado == "Aceptada" %}
+            {% set ns_acc.acc = ns_acc.acc + 1 %}
+          {% endif %}
+        {% endfor %}
+      {% endfor %}
+
+      {% set acc_person = (solicitudes_personalizadas | selectattr("estado", "equalto", "Aceptada") | list) | length %}
+      {% set total_confirmadas = ns_acc.acc + acc_person %}
+
+      <div class="kpis">
+        <div class="kpi blue">
+          <div>
+            <div class="lbl">Retos activos</div>
+            <div class="val">{{ retos_activos|length }}</div>
+          </div>
+          <div class="pill blue">●</div>
+        </div>
+
+        <div class="kpi red">
+          <div>
+            <div class="lbl">Retos cerrados</div>
+            <div class="val">{{ retos_cerrados|length }}</div>
+          </div>
+          <div class="pill bad">×</div>
+        </div>
+
+        <div class="kpi orange">
+          <div>
+            <div class="lbl">Solicitudes pendientes</div>
+            <div class="val">{{ total_pendientes }}</div>
+          </div>
+          <div class="pill warn">!</div>
+        </div>
+
+        <div class="kpi green">
+          <div>
+            <div class="lbl">Retos confirmados</div>
+            <div class="val">{{ total_confirmadas }}</div>
+          </div>
+          <div class="pill ok">✓</div>
+        </div>
+      </div>
+
+      {% if aviso %}
+        <div class="alert success">{{ aviso }}</div>
+      {% endif %}
+
+      <!-- CREAR RETO -->
+      <div class="admin-card">
+        <div class="title-row">
+          <h2>➕ Crear nuevo reto</h2>
+        </div>
+
+        <form method="POST" action="{{ url_for('admin_crear_reto') }}" class="form-grid">
+          <div>
+            <label>Fecha</label>
+            <input type="date" name="fecha" required>
+          </div>
+
+          <div>
+            <label>Hora</label>
+            <select name="hora" required>
+              <option value="">Selecciona hora</option>
+              {% for h in ["9am","10am","11am","12pm","1pm","2pm","3pm","4pm","5pm","6pm","7pm","8pm","9pm","10pm"] %}
+                <option value="{{ h }}">{{ h }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div>
+            <label>Cancha</label>
+            <select name="cancha_id" required>
+              <option value="">Selecciona cancha</option>
+              {% for c in canchas %}
+                <option value="{{ c.id }}">{{ c.nombre }} · {{ c.tipo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div>
+            <label>Precio</label>
+            <input type="number" name="precio" min="0" value="25000">
+          </div>
+
+          <div>
+            <label>Cupo</label>
+            <input type="number" name="cupo" min="1" value="10">
+          </div>
+
+          <div class="full">
+            <label>Descripción (opcional)</label>
+            <input type="text" name="descripcion" placeholder="Ej: nivel intermedio / reto abierto">
+          </div>
+
+          <div class="full btn-row">
+            <button class="btn primary" type="submit">✅ Publicar reto</button>
+            <a class="btn ghost" href="{{ url_for('retos_publicos') }}">👀 Ver como cliente</a>
+          </div>
+        </form>
+      </div>
+
+      <!-- RETOS PUBLICADOS -->
+      <div class="admin-card">
+        <div class="title-row">
+          <h2>📋 Retos publicados</h2>
+        </div>
+
+        <div class="retos-toolbar">
+          <div class="seg" id="segTabs">
+            <a class="active" href="#" data-filter="all">Todos</a>
+            <a href="#" data-filter="activo">Activos</a>
+            <a href="#" data-filter="cerrado">Cerrados</a>
+            <a href="#" data-filter="pendiente">Pendientes</a>
+          </div>
+
+          <div class="retos-filter">
+            🔎 <input id="retosSearch" type="text" placeholder="Filtrar por cancha, fecha o nota…">
+          </div>
+        </div>
+
+        {% if retos %}
+          <div class="list" id="retosList">
+
+            {% for r in retos %}
+              {% set status = 'activo' if r.estado == 'Activo' else 'cerrado' %}
+              {% set lista = solicitudes_por_reto.get(r.id, []) %}
+              {% set tiene_pendientes = (lista | selectattr("estado", "equalto", "Pendiente") | list | length) > 0 %}
+
+              <div class="reto-item"
+                   data-status="{{ status }}"
+                   data-has-pending="{{ 'yes' if tiene_pendientes else 'no' }}"
+                   data-search="{{ (r.cancha_nombre ~ ' ' ~ r.tipo ~ ' ' ~ (r.fecha|fecha_latina) ~ ' ' ~ r.hora ~ ' ' ~ (r.descripcion or ''))|lower }}">
+
+                <div class="reto-left">
+                  <div class="thumb"></div>
+                  <div>
+                    <div class="reto-title">
+                      {{ r.cancha_nombre }} ({{ r.tipo }}) · {{ r.fecha|fecha_latina }} · {{ r.hora }}
+                      {% if r.estado == "Activo" %}
+                        <span class="pill ok" style="margin-left:10px;">ACTIVO</span>
+                      {% else %}
+                        <span class="pill bad" style="margin-left:10px;">CERRADO</span>
+                      {% endif %}
+                    </div>
+                    <div class="reto-meta">
+                      Precio: {{ r.precio|colones }} · Cupo: {{ r.cupo }}
+                      {% if r.descripcion %} · Nota: {{ r.descripcion }}{% endif %}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="reto-right">
+                  <span class="pill">{{ lista|length }} Solicitud{% if lista|length != 1 %}es{% endif %}</span>
+
+                  <a class="btn whatsapp" target="_blank"
+                     href="https://wa.me/?text={{ (
+                       '🏆 RETO DISPONIBLE\n'
+                       ~ 'Cancha: ' ~ r.cancha_nombre ~ ' (' ~ r.tipo ~ ')\n'
+                       ~ 'Fecha: ' ~ (r.fecha|fecha_latina) ~ '\n'
+                       ~ 'Hora: ' ~ r.hora ~ '\n'
+                       ~ 'Precio: ' ~ (r.precio|colones) ~ '\n'
+                       ~ 'Cupo: ' ~ r.cupo ~ '\n'
+                       ~ (('Nota: ' ~ r.descripcion ~ '\n') if r.descripcion else '')
+                       ~ '\nEscríbenos para solicitar este reto.'
+                     ) | urlencode }}">
+                    📲 Compartir
+                  </a>
+
+                  {% if r.estado == "Activo" %}
+                    <a class="btn danger" href="{{ url_for('admin_cerrar_reto', reto_id=r.id) }}">Cerrar</a>
+                  {% else %}
+                    <span class="pill">Sin acciones</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="admin-card reto-subcard"
+                   data-status="{{ status }}"
+                   data-has-pending="{{ 'yes' if tiene_pendientes else 'no' }}"
+                   data-search="{{ (r.cancha_nombre ~ ' ' ~ (r.fecha|fecha_latina) ~ ' ' ~ r.hora ~ ' solicitudes')|lower }}"
+                   style="margin-top:10px;">
+
+                <div class="title-row">
+                  <h2>📨 Solicitudes para este reto</h2>
+                </div>
+
+                {% if lista %}
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Fecha solicitud</th>
+                          <th>Cliente</th>
+                          <th>Teléfono</th>
+                          <th>Método</th>
+                          <th>Nota</th>
+                          <th>Estado</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {% for s in lista %}
+                          <tr>
+                            <td>{{ s.fecha_creacion }}</td>
+                            <td>{{ s.nombre }}</td>
+                            <td>{{ s.telefono }}</td>
+                            <td>{{ s.metodo_pago }}</td>
+                            <td>{{ s.nota or "—" }}</td>
+                            <td>
+                              {% if s.estado == "Pendiente" %}
+                                <span class="pill warn">Pendiente</span>
+                              {% elif s.estado == "Aceptada" %}
+                                <span class="pill ok">Aceptada</span>
+                              {% else %}
+                                <span class="pill bad">Rechazada</span>
+                              {% endif %}
+                            </td>
+                            <td>
+                              <div class="actions">
+                                {% if s.estado == "Pendiente" and r.estado == "Activo" %}
+                                  <a class="btn primary" href="{{ url_for('admin_accion_solicitud', sol_id=s.id, accion='aceptar') }}">✅ Aceptar</a>
+                                  <a class="btn danger" href="{{ url_for('admin_accion_solicitud', sol_id=s.id, accion='rechazar') }}">❌ Rechazar</a>
+                                {% else %}
+                                  <span class="pill">Sin cambios</span>
+                                {% endif %}
+
+                                {% set tel = (s.telefono|replace('-', '')|replace(' ', '')|replace('+','')) %}
+                                {% if tel|length == 8 %}{% set tel = '506' ~ tel %}{% endif %}
+                                {% set texto = "Hola " ~ s.nombre ~ ", vi tu solicitud para el reto del " ~ (r.fecha|fecha_latina) ~ " " ~ r.hora ~ " en " ~ r.cancha_nombre ~ ". Estado: " ~ s.estado ~ ". ¿Confirmas participación?" %}
+                                <a class="btn whatsapp" target="_blank" href="https://wa.me/{{ tel }}?text={{ texto|urlencode }}">📲 Contactar</a>
+                              </div>
+                            </td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                {% else %}
+                  <div class="alert">Aún no hay solicitudes para este reto.</div>
+                {% endif %}
+              </div>
+
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="alert">No hay retos publicados aún.</div>
+        {% endif %}
+      </div>
+
+      <!-- SOLICITUDES PERSONALIZADAS -->
+      <div class="admin-card">
+        <div class="title-row">
+          <h2>📨 Solicitudes de reto personalizado</h2>
+        </div>
+
+        {% if solicitudes_personalizadas %}
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha solicitada</th>
+                  <th>Hora</th>
+                  <th>Cancha</th>
+                  <th>Cliente</th>
+                  <th>Teléfono</th>
+                  <th>Método</th>
+                  <th>Nota</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {% for s in solicitudes_personalizadas %}
+                  <tr>
+                    <td>{{ s.fecha | fecha_latina }}</td>
+                    <td>{{ s.hora }}</td>
+                    <td>{{ s.cancha_id }}</td>
+                    <td>{{ s.nombre }}</td>
+                    <td>{{ s.telefono }}</td>
+                    <td>{{ s.metodo_pago }}</td>
+                    <td>{{ s.nota or "—" }}</td>
+                    <td>
+                      {% if s.estado == "Pendiente" %}
+                        <span class="pill warn">Pendiente</span>
+                      {% elif s.estado == "Aceptada" %}
+                        <span class="pill ok">Aceptada</span>
+                      {% else %}
+                        <span class="pill bad">Rechazada</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div class="actions">
+                        {% if s.estado == "Pendiente" %}
+                          <a class="btn primary" href="{{ url_for('admin_accion_solicitud', sol_id=s.id, accion='aceptar') }}">✅ Aceptar</a>
+                          <a class="btn danger" href="{{ url_for('admin_accion_solicitud', sol_id=s.id, accion='rechazar') }}">❌ Rechazar</a>
+                        {% else %}
+                          <span class="pill">Sin cambios</span>
+                        {% endif %}
+
+                        {% set tel = (s.telefono|replace('-', '')|replace(' ', '')|replace('+','')) %}
+                        {% if tel|length == 8 %}{% set tel = '506' ~ tel %}{% endif %}
+                        {% set texto = "Hola " ~ s.nombre ~ ", recibí tu solicitud de reto para " ~ (s.fecha|fecha_latina) ~ " a las " ~ s.hora ~ ". ¿Confirmas detalles?" %}
+                        <a class="btn whatsapp" target="_blank" href="https://wa.me/{{ tel }}?text={{ texto|urlencode }}">📲 Contactar</a>
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="alert">No hay solicitudes personalizadas pendientes.</div>
+        {% endif %}
+      </div>
+
+      <script>
+        (function(){
+          const tabs = document.querySelectorAll('#segTabs a');
+          const search = document.getElementById('retosSearch');
+          const items = Array.from(document.querySelectorAll('.reto-item'));
+          const subcards = Array.from(document.querySelectorAll('.reto-subcard'));
+
+          let currentFilter = 'all';
+
+          function apply(){
+            const q = (search?.value || '').trim().toLowerCase();
+
+            const showByFilter = (el) => {
+              const st = el.getAttribute('data-status');
+              const hasPending = el.getAttribute('data-has-pending');
+
+              if(currentFilter === 'all') return true;
+              if(currentFilter === 'pendiente') return hasPending === 'yes';
+              return st === currentFilter;
+            };
+
+            const showBySearch = (el) => {
+              if(!q) return true;
+              const blob = (el.getAttribute('data-search') || '');
+              return blob.includes(q);
+            };
+
+            items.forEach((it, idx) => {
+              const ok = showByFilter(it) && showBySearch(it);
+              it.classList.toggle('is-hidden', !ok);
+
+              const sc = subcards[idx];
+              if(sc) sc.classList.toggle('is-hidden', !ok);
+            });
+          }
+
+          tabs.forEach(t => {
+            t.addEventListener('click', (e) => {
+              e.preventDefault();
+              tabs.forEach(x => x.classList.remove('active'));
+              t.classList.add('active');
+              currentFilter = t.dataset.filter || 'all';
+              apply();
+            });
+          });
+
+          if(search){
+            search.addEventListener('input', apply);
+          }
+
+          apply();
+        })();
+      </script>
+
+    </main>
+  </div>
+</body>
+</html>

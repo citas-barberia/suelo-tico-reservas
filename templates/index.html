@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Suelo Tico · Reserva de Canchas</title>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='cliente.css') }}">
+</head>
+
+<body class="st-client-body">
+
+  <div class="st-app">
+
+    <!-- SIDEBAR -->
+    <aside class="st-side">
+      <div class="st-brand">
+        <div class="st-mark">ST</div>
+        <div class="st-brand-txt">
+          <div class="st-brand-name">SUELO TICO</div>
+          <div class="st-brand-sub">RESERVAS</div>
+        </div>
+      </div>
+
+      <nav class="st-nav">
+        <a class="st-nav-link active" href="{{ url_for('index') }}">
+          <span class="st-ico">🏟️</span>
+          <span>Reservar Cancha</span>
+        </a>
+
+        <a class="st-nav-link" href="{{ url_for('retos_publicos') }}">
+          <span class="st-ico">🏆</span>
+          <span>Retos</span>
+          <span class="st-badge">NUEVO</span>
+        </a>
+      </nav>
+
+      <div class="st-side-card">
+        <div class="st-side-title">Tarifas</div>
+        <div class="st-side-row">
+          <span>9:00 AM – 5:00 PM</span>
+          <b>₡20.000</b>
+        </div>
+        <div class="st-side-row">
+          <span>6:00 PM – 10:00 PM</span>
+          <b>₡25.000</b>
+        </div>
+      </div>
+
+      <div class="st-side-card">
+        <div class="st-side-title">Pago</div>
+        <div class="st-side-row">
+          <span>SINPE Móvil</span>
+          <b>{{ numero_sinpe }}</b>
+        </div>
+        <div class="st-side-row">
+          <span>WhatsApp</span>
+          <b>{{ dueno_telefono }}</b>
+        </div>
+      </div>
+
+      <div class="st-side-foot">
+        <a class="st-foot-link" href="#">Ayuda</a>
+        <a class="st-foot-link" href="#">Privacidad</a>
+        <a class="st-foot-link" href="#">Términos</a>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="st-main">
+
+      <!-- TOPBAR -->
+      <div class="st-topbar">
+        <div class="st-steps" aria-label="Progreso">
+          <div class="st-step active">
+            <span class="st-step-num">1</span>
+            <span class="st-step-txt">Cancha</span>
+          </div>
+          <div class="st-step-line"></div>
+          <div class="st-step" id="stepFecha">
+            <span class="st-step-num">2</span>
+            <span class="st-step-txt">Fecha</span>
+          </div>
+          <div class="st-step-line"></div>
+          <div class="st-step" id="stepReserva">
+            <span class="st-step-num">3</span>
+            <span class="st-step-txt">Reserva</span>
+          </div>
+        </div>
+
+        <div class="st-user">
+          <div class="st-user-avatar">👤</div>
+          <div class="st-user-name">Cliente</div>
+        </div>
+      </div>
+
+      <!-- HERO -->
+      <section class="st-hero">
+        <div class="st-hero-overlay"></div>
+        <div class="st-hero-content">
+          <h1 class="st-title">Reserva tu cancha</h1>
+          <p class="st-subtitle">Selecciona cancha, fecha y hora disponible.</p>
+        </div>
+      </section>
+
+      <!-- MENSAJES -->
+      {% if mensaje %}
+        <div class="st-toast {{ 'ok' if tipo_mensaje == 'success' else 'bad' }}">
+          <span class="st-toast-ico">
+            {% if tipo_mensaje == 'success' %}✅{% else %}⚠️{% endif %}
+          </span>
+          <div class="st-toast-txt">{{ mensaje }}</div>
+        </div>
+      {% endif %}
+
+      <!-- GRID -->
+      <section class="st-grid">
+
+        <!-- CENTRO -->
+        <div class="st-center">
+
+          <!-- 1) CANCHAS -->
+          <div class="st-card">
+            <div class="st-card-head">
+              <h2>1. Selecciona una cancha</h2>
+            </div>
+
+            <!-- Select real (JS) oculto -->
+            <div class="st-hidden">
+              <select id="canchaSelect">
+                <option value="">Selecciona una cancha</option>
+                {% for c in canchas %}
+                  <option value="{{ c.id }}" {% if cancha_sel|string == c.id|string %}selected{% endif %}>
+                    {{ c.nombre }} · {{ c.tipo }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="st-canchas">
+              {% for c in canchas %}
+                {% set isSel = (cancha_sel|string == c.id|string) %}
+
+                <button
+                  type="button"
+                  class="st-cancha {{ 'selected' if isSel else '' }}"
+                  data-cancha-id="{{ c.id }}"
+                  data-cancha-txt="{{ c.nombre }} · {{ c.tipo }}"
+                >
+
+                  <!-- IMAGEN (sin onerror con Jinja, para NO romper VSCode) -->
+                  <div class="st-cancha-img" style="position:relative; overflow:hidden;">
+                    <img
+                      class="st-cancha-photo"
+                      src="{{ url_for('static', filename='cancha' ~ c.id ~ '.jpg') }}"
+                      data-jpg="{{ url_for('static', filename='cancha' ~ c.id ~ '.jpg') }}"
+                      data-png="{{ url_for('static', filename='cancha' ~ c.id ~ '.png') }}"
+                      data-default="{{ url_for('static', filename='cancha.jpg') }}"
+                      alt="Imagen {{ c.nombre }}"
+                      loading="lazy"
+                      decoding="async"
+                      style="width:100%;height:100%;object-fit:cover;display:block;"
+                    />
+                  </div>
+
+                  <!-- INFO -->
+                  <div class="st-cancha-info">
+                    <div class="st-cancha-name">{{ c.nombre }}</div>
+                    <div class="st-cancha-type">{{ c.tipo }}</div>
+
+                    <div class="st-cancha-status">
+                      <span class="dot {{ 'ok' if isSel else 'free' }}"></span>
+                      <span class="txt">{{ 'Seleccionada' if isSel else 'Disponible' }}</span>
+                    </div>
+                  </div>
+
+                </button>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- 2) FECHA + HORAS -->
+          <div class="st-card">
+            <div class="st-card-head">
+              <h2>2. Selecciona una fecha y hora</h2>
+            </div>
+
+            <div class="st-row">
+              <div class="st-field">
+                <label>Fecha</label>
+                <input
+                  type="date"
+                  id="fechaInput"
+                  value="{{ fecha_sel if fecha_sel else fecha_hoy }}"
+                  min="{{ fecha_hoy }}"
+                />
+              </div>
+
+              <div class="st-field">
+                <label>Hora seleccionada</label>
+                <input id="horaElegidaTxt" type="text" value="—" readonly />
+              </div>
+
+              <div class="st-field">
+                <label>Estado</label>
+                <input id="estadoTxt" type="text" value="—" readonly />
+              </div>
+            </div>
+
+            <div class="st-hours">
+              <div class="st-hours-tip">Tip: toca una hora <b>Libre</b> para seleccionar.</div>
+              <div id="slotsGrid" class="st-hours-grid"></div>
+              <div id="horariosMensaje" class="st-hours-msg"></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- RESUMEN -->
+        <aside class="st-summary">
+          <div class="st-summary-card">
+            <div class="st-summary-title">Resumen de Reserva</div>
+
+            <div class="st-summary-item">
+              <span class="st-si-ico">⚽</span>
+              <div>
+                <div class="st-si-top" id="sumCancha">—</div>
+                <div class="st-si-sub">Cancha seleccionada</div>
+              </div>
+            </div>
+
+            <div class="st-summary-item">
+              <span class="st-si-ico">📅</span>
+              <div>
+                <div class="st-si-top" id="sumFecha">—</div>
+                <div class="st-si-sub">Fecha</div>
+              </div>
+            </div>
+
+            <div class="st-summary-item">
+              <span class="st-si-ico">🕘</span>
+              <div>
+                <div class="st-si-top" id="sumHora">—</div>
+                <div class="st-si-sub">Hora</div>
+              </div>
+            </div>
+
+            <div class="st-line"></div>
+
+            <form method="POST" action="{{ url_for('index') }}" id="formReserva">
+              <input type="hidden" name="fecha" id="fechaHidden" value="{{ fecha_sel if fecha_sel else fecha_hoy }}">
+              <input type="hidden" name="cancha_id" id="canchaHidden" value="{{ cancha_sel if cancha_sel else '' }}">
+              <input type="hidden" name="hora" id="horaHidden" value="">
+
+              <div class="st-field">
+                <label>Hora</label>
+                <select id="horaSelect" disabled>
+                  <option value="">Selecciona una hora</option>
+                </select>
+                <div class="st-help">Primero toca una hora libre en la lista.</div>
+              </div>
+
+              <div class="st-field">
+                <label>Nombre Completo</label>
+                <input type="text" name="nombre" placeholder="Ingresa tu nombre" required />
+              </div>
+
+              <div class="st-field">
+                <label>Teléfono</label>
+                <input type="tel" name="telefono" placeholder="Ingresa tu número" required />
+              </div>
+
+              <div class="st-field">
+                <label>Método de pago</label>
+                <select name="metodo_pago" required>
+                  <option value="">Selecciona método</option>
+                  <option value="SINPE">SINPE</option>
+                  <option value="Efectivo">Efectivo</option>
+                </select>
+              </div>
+
+              <button type="submit" class="st-btn" id="btnConfirmar" disabled>
+                Confirmar Reserva
+              </button>
+
+              <div class="st-note">
+                Si cancelas por SINPE, envía el comprobante al <b>{{ numero_sinpe }}</b>.
+              </div>
+            </form>
+          </div>
+        </aside>
+
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      // ====== FIX IMÁGENES (jpg -> png -> default) ======
+      document.querySelectorAll(".st-cancha-photo").forEach(function (img) {
+        img.addEventListener("error", function () {
+          const tried = img.dataset.tried || "";
+          const jpg = img.getAttribute("data-jpg");
+          const png = img.getAttribute("data-png");
+          const def = img.getAttribute("data-default");
+
+          if (tried === "") {
+            img.dataset.tried = "jpg";
+            img.src = png;
+          } else if (tried === "jpg") {
+            img.dataset.tried = "png";
+            img.src = def;
+          } else {
+            img.onerror = null;
+          }
+        });
+      });
+
+      const fechaInput = document.getElementById("fechaInput");
+      const canchaSelect = document.getElementById("canchaSelect");
+      const slotsGrid = document.getElementById("slotsGrid");
+      const msg = document.getElementById("horariosMensaje");
+
+      const fechaHidden = document.getElementById("fechaHidden");
+      const canchaHidden = document.getElementById("canchaHidden");
+      const horaHidden = document.getElementById("horaHidden");
+
+      const horaSelect = document.getElementById("horaSelect");
+      const btnConfirmar = document.getElementById("btnConfirmar");
+
+      const horaElegidaTxt = document.getElementById("horaElegidaTxt");
+      const estadoTxt = document.getElementById("estadoTxt");
+
+      // resumen
+      const sumCancha = document.getElementById("sumCancha");
+      const sumFecha = document.getElementById("sumFecha");
+      const sumHora = document.getElementById("sumHora");
+
+      if (!fechaInput || !canchaSelect) return;
+
+      // UI: 7:00p
+      const HORARIOS_UI = ["9:00a","10:00a","11:00a","12:00p","1:00p","2:00p","3:00p","4:00p","5:00p","6:00p","7:00p","8:00p","9:00p","10:00p"];
+
+      // backend key: 9am, 10am, 12pm, 7pm...
+      function uiToKey(h) {
+        const parts = h.split(":00");
+        const hour = parts[0];
+        const ap = parts[1]; // a/p
+        return (hour + (ap === "a" ? "am" : "pm")).toLowerCase();
+      }
+
+      function canchaTextActual() {
+        const opt = canchaSelect.options[canchaSelect.selectedIndex];
+        return opt ? opt.textContent.trim() : "—";
+      }
+
+      function setResumen() {
+        sumCancha.textContent = canchaSelect.value ? canchaTextActual() : "—";
+        sumFecha.textContent = fechaInput.value ? fechaInput.value : "—";
+        sumHora.textContent = horaHidden.value ? horaHidden.value : "—";
+      }
+
+      function resetSeleccionHora() {
+        horaHidden.value = "";
+        horaSelect.innerHTML = '<option value="">Selecciona una hora</option>';
+        horaSelect.disabled = true;
+        btnConfirmar.disabled = true;
+
+        horaElegidaTxt.value = "—";
+        estadoTxt.value = "—";
+        setResumen();
+      }
+
+      function pintarSlots(disponiblesSet) {
+        slotsGrid.innerHTML = "";
+
+        HORARIOS_UI.forEach(function (hUI) {
+          const key = uiToKey(hUI);
+          const libre = disponiblesSet.has(key);
+
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "st-slot" + (libre ? " free" : " busy");
+          btn.setAttribute("data-hora", key);
+
+          btn.innerHTML =
+            '<div class="st-slot-left">' +
+              '<div class="st-slot-hour">' + hUI + '</div>' +
+              '<div class="st-slot-sub">' + (libre ? "Libre" : "No disponible") + '</div>' +
+            '</div>';
+
+          if (libre) {
+            btn.addEventListener("click", function () {
+              seleccionarHora(key, hUI);
+            });
+          } else {
+            btn.disabled = true;
+          }
+
+          slotsGrid.appendChild(btn);
+        });
+      }
+
+      function seleccionarHora(horaKey, horaUI) {
+        document.querySelectorAll(".st-slot").forEach(function (el) {
+          el.classList.remove("selected");
+        });
+        const el = document.querySelector('.st-slot[data-hora="' + horaKey + '"]');
+        if (el) el.classList.add("selected");
+
+        horaHidden.value = horaKey;
+
+        horaSelect.disabled = false;
+        horaSelect.innerHTML = '<option value="' + horaKey + '">' + horaUI + '</option>';
+        horaSelect.value = horaKey;
+
+        btnConfirmar.disabled = false;
+
+        horaElegidaTxt.value = horaUI;
+        estadoTxt.value = "Libre";
+
+        setResumen();
+
+        const s2 = document.getElementById("stepFecha");
+        const s3 = document.getElementById("stepReserva");
+        if (s2) s2.classList.add("active");
+        if (s3) s3.classList.add("active");
+      }
+
+      async function cargarHorarios() {
+        const fecha = (fechaInput.value || "").trim();
+        const canchaId = (canchaSelect.value || "").trim();
+
+        msg.textContent = "";
+        fechaHidden.value = fecha;
+        canchaHidden.value = canchaId;
+
+        resetSeleccionHora();
+        setResumen();
+
+        if (!fecha || !canchaId) {
+          slotsGrid.innerHTML = "";
+          msg.textContent = "Selecciona fecha y cancha";
+          return;
+        }
+
+        try {
+          const url = "/horarios_disponibles?fecha=" + encodeURIComponent(fecha) + "&cancha_id=" + encodeURIComponent(canchaId);
+          const res = await fetch(url);
+          const data = await res.json();
+
+          if (data.ok) {
+            const disponibles = (data.horarios || []).map(function (x) { return String(x).toLowerCase(); });
+            const set = new Set(disponibles);
+            pintarSlots(set);
+          } else {
+            slotsGrid.innerHTML = "";
+            msg.textContent = data.mensaje || "No se pudieron cargar los horarios.";
+          }
+        } catch (e) {
+          slotsGrid.innerHTML = "";
+          msg.textContent = "Error al cargar horarios.";
+        }
+      }
+
+      // click en tarjetas cancha
+      document.querySelectorAll(".st-cancha").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          const id = btn.getAttribute("data-cancha-id");
+          if (!id) return;
+
+          canchaSelect.value = id;
+
+          document.querySelectorAll(".st-cancha").forEach(function (x) {
+            x.classList.remove("selected");
+          });
+          btn.classList.add("selected");
+
+          cargarHorarios();
+        });
+      });
+
+      fechaInput.addEventListener("change", cargarHorarios);
+      canchaSelect.addEventListener("change", cargarHorarios);
+
+      setResumen();
+      if (fechaInput.value && canchaSelect.value) cargarHorarios();
+    })();
+  </script>
+
+</body>
+</html>

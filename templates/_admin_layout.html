@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ page_title or "Suelo Tico · Admin" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="admin-body">
+
+  <div class="admin-shell">
+
+    <!-- SIDEBAR -->
+    <aside class="admin-sidebar">
+      <div class="admin-brand">
+        <div class="brand-mark">ST</div>
+        <div class="brand-text">
+          <div class="brand-name">Suelo Tico</div>
+          <div class="brand-sub">ADMIN PANEL</div>
+        </div>
+      </div>
+
+      <nav class="admin-nav">
+        <a class="admin-link {% if active_tab=='retos' %}active{% endif %}" href="{{ url_for('admin_retos') }}">🏆 Retos</a>
+        <a class="admin-link {% if active_tab=='operacion' %}active{% endif %}" href="{{ url_for('admin') }}">📋 Operación</a>
+        <a class="admin-link {% if active_tab=='agenda' %}active{% endif %}" href="{{ url_for('admin_agenda') }}">🧾 Agenda</a>
+        <a class="admin-link {% if active_tab=='historial' %}active{% endif %}" href="{{ url_for('admin_historial') }}">📚 Historial</a>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <a class="admin-logout" href="{{ url_for('logout_admin') }}">🚪 Cerrar sesión</a>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="admin-main">
+
+      <!-- TOPBAR -->
+      <div class="admin-top">
+        <div class="admin-top-left">
+          <h1 class="admin-title">{{ page_h1 or "Panel" }}</h1>
+          {% if page_subtitle %}
+            <p class="admin-subtitle">{{ page_subtitle }}</p>
+          {% endif %}
+        </div>
+
+        <div class="admin-top-right">
+          <div class="admin-user-pill">
+            <span class="pill-ico">👤</span>
+            <span class="pill-text">{{ admin_usuario }}</span>
+          </div>
+        </div>
+      </div>
+
+      {% if aviso %}
+        <div class="admin-alert success">{{ aviso }}</div>
+      {% endif %}
+
+      <!-- HERO CARDS (opcionales) -->
+      {% if hero_cards %}
+        <div class="admin-hero-cards">
+          {% for c in hero_cards %}
+            <div class="hero-card">
+              <div class="hero-card-label">{{ c.label }}</div>
+              <div class="hero-card-value">{{ c.value }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <!-- CONTENT -->
+      <div class="admin-content">
+        {% block content %}{% endblock %}
+      </div>
+
+    </main>
+  </div>
+
+</body>
+</html>

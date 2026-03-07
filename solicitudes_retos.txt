@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "reto_id": 1,
+    "nombre": "derek",
+    "telefono": "72314147",
+    "nota": "estamos los 5",
+    "estado": "Aceptada",
+    "fecha_creacion": "2026-03-02 22:01:55",
+    "tipo": "Publicado"
+  },
+  {
+    "id": 2,
+    "tipo": "Personalizado",
+    "reto_id": null,
+    "fecha": "2026-03-03",
+    "hora": "9pm",
+    "cancha_id": 1,
+    "nombre": "kevin",
+    "telefono": "85600754",
+    "metodo_pago": "SINPE",
+    "nota": "somos 5 de una vez",
+    "estado": "Aceptada",
+    "fecha_creacion": "2026-03-02 22:38:12",
+    "reserva_id": 22
+  },
+  {
+    "id": 3,
+    "tipo": "Personalizado",
+    "reto_id": null,
+    "fecha": "2026-03-03",
+    "hora": "8pm",
+    "cancha_id": 1,
+    "nombre": "kevin",
+    "telefono": "70694357",
+    "metodo_pago": "Efectivo",
+    "nota": "",
+    "estado": "Aceptada",
+    "fecha_creacion": "2026-03-02 23:05:34",
+    "reserva_id": 23
+  },
+  {
+    "id": 4,
+    "tipo": "Personalizado",
+    "reto_id": null,
+    "fecha": "2026-03-04",
+    "hora": "5pm",
+    "cancha_id": 3,
+    "nombre": "derek",
+    "telefono": "85600754",
+    "metodo_pago": "SINPE",
+    "nota": "somo 5 y vamos de color azul",
+    "estado": "Aceptada",
+    "fecha_creacion": "2026-03-03 19:39:30",
+    "reserva_id": 24
+  },
+  {
+    "id": 5,
+    "tipo": "Personalizado",
+    "reto_id": null,
+    "fecha": "2026-03-07",
+    "hora": "9am",
+    "cancha_id": 1,
+    "nombre": "jose",
+    "telefono": "72314147",
+    "metodo_pago": "Efectivo",
+    "nota": "somos 5 vamos de camisa oscura",
+    "estado": "Aceptada",
+    "fecha_creacion": "2026-03-07 02:46:34",
+    "reserva_id": 26
+  }
+]

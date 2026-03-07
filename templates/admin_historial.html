@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Suelo Tico · Historial</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body class="admin-body">
+  <div class="admin-shell">
+
+    <!-- SIDEBAR -->
+    <aside class="admin-sidebar">
+      <div class="brand">
+        <div class="brand-mark">ST</div>
+        <div class="brand-txt">
+          <div class="name">SUELO TICO</div>
+          <div class="sub">ADMIN PANEL</div>
+        </div>
+      </div>
+
+      {% set active_tab = 'historial' %}
+      {% include "_admin_tabs.html" with context %}
+
+      <div class="sidebar-footer">
+        
+        <a class="admin-logout" href="{{ url_for('logout_admin') }}">Cerrar sesión</a>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="admin-main">
+
+      <!-- TOPBAR -->
+      <div class="admin-topbar">
+        <div class="search">
+          🔎 <input type="text" placeholder="Buscar… (visual)" />
+        </div>
+
+        <div class="top-actions">
+          <div class="icon-btn">🔔</div>
+          <div class="icon-btn">💬</div>
+
+          <div class="user-pill">
+            <div class="user-avatar">{{ (admin_usuario[:1] if admin_usuario else 'A')|upper }}</div>
+            <div class="user-meta">
+              <div class="u">{{ admin_usuario }}</div>
+              <div class="r">Administrador</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-head">
+        <h1>Historial y <span class="accent">Reportes</span></h1>
+        <p>Consultas históricas, pagos confirmados y cancelaciones</p>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpis">
+        <div class="kpi green">
+          <div>
+            <div class="lbl">Dinero del mes</div>
+            <div class="val">{{ resumen_mes_hist.dinero | colones }}</div>
+          </div>
+          <div class="pill ok">✓</div>
+        </div>
+
+        <div class="kpi blue">
+          <div>
+            <div class="lbl">Reservas del mes</div>
+            <div class="val">{{ resumen_mes_hist.reservas }}</div>
+          </div>
+          <div class="pill blue">●</div>
+        </div>
+
+        <div class="kpi orange">
+          <div>
+            <div class="lbl">Pagos confirmados</div>
+            <div class="val">{{ pagos_confirmados|length }}</div>
+          </div>
+          <div class="pill warn">!</div>
+        </div>
+
+        <div class="kpi red">
+          <div>
+            <div class="lbl">Canceladas (filtrado)</div>
+            <div class="val">{{ canceladas|length }}</div>
+          </div>
+          <div class="pill bad">×</div>
+        </div>
+      </div>
+
+      {% if aviso %}
+        <div class="alert success">{{ aviso }}</div>
+      {% endif %}
+
+      <!-- Filtros -->
+      <div class="admin-card">
+        <div class="title-row">
+          <h2>🔎 Filtros del historial</h2>
+        </div>
+
+        <form method="GET" action="{{ url_for('admin_historial') }}" class="form-grid">
+          <div>
+            <label>Desde</label>
+            <input type="date" name="desde" value="{{ desde_filtro }}">
+          </div>
+
+          <div>
+            <label>Hasta</label>
+            <input type="date" name="hasta" value="{{ hasta_filtro }}">
+          </div>
+
+          <div>
+            <label>Cancha</label>
+            <select name="cancha_id">
+              <option value="">Todas las canchas</option>
+              {% for c in canchas %}
+                <option value="{{ c.id }}" {% if cancha_filtro|string == c.id|string %}selected{% endif %}>
+                  {{ c.nombre }} · {{ c.tipo }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="full btn-row">
+            <button class="btn primary" type="submit">Buscar</button>
+            <a class="btn ghost" href="{{ url_for('admin_historial') }}">Limpiar</a>
+
+            <a class="btn ghost"
+               href="{{ url_for('exportar_historial_csv', desde=desde_filtro, hasta=hasta_filtro, cancha_id=cancha_filtro) }}">
+              ⬇️ Exportar CSV
+            </a>
+          </div>
+        </form>
+      </div>
+
+      <!-- Historial maestro (SINPE / EFECTIVO) -->
+      <div class="admin-card">
+        <div class="title-row">
+          <h2>📋 Historial maestro (filtrado)</h2>
+          <span class="pill">Ordenado por fecha/hora</span>
+        </div>
+
+        {% set lista_sinpe = reservas | selectattr("metodo_pago", "equalto", "SINPE") | list %}
+        {% set lista_efectivo = reservas | selectattr("metodo_pago", "equalto", "Efectivo") | list %}
+
+        <!-- SINPE -->
+        <div class="admin-card" style="margin-top:12px;">
+          <div class="title-row">
+            <h2>🟡 Reservas SINPE</h2>
+            <span class="pill warn">{{ lista_sinpe|length }}</span>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Hora</th>
+                  <th>Cliente</th>
+                  <th>Teléfono</th>
+                  <th>Cancha</th>
+                  <th>Tipo</th>
+                  <th>Método</th>
+                  <th>Monto</th>
+                  <th>Estado</th>
+                  <th>Pago</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {% if lista_sinpe %}
+                  {% for r in lista_sinpe %}
+                    <tr>
+                      <td>{{ r.fecha | fecha_latina }}</td>
+                      <td>{{ r.hora }}</td>
+                      <td>{{ r.nombre }}</td>
+                      <td>{{ r.telefono }}</td>
+                      <td>{{ r.cancha_nombre }}</td>
+                      <td>{{ r.cancha_tipo }}</td>
+                      <td>{{ r.metodo_pago }}</td>
+                      <td>{{ r.monto | colones }}</td>
+                      <td>
+                        {% if r.estado == "Cancelada" %}
+                          <span class="pill bad">Cancelada</span>
+                        {% else %}
+                          <span class="pill ok">Reservada</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if r.estado == "Cancelada" %}
+                          —
+                        {% elif r.pagado %}
+                          <span class="pill ok">Pagado</span>
+                        {% elif r.sinpe_reportado_cliente %}
+                          <span class="pill warn">Reportado</span>
+                        {% else %}
+                          <span class="pill bad">Pendiente</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr><td colspan="10">No hay reservas SINPE con esos filtros.</td></tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- EFECTIVO -->
+        <div class="admin-card" style="margin-top:12px;">
+          <div class="title-row">
+            <h2>💵 Reservas Efectivo</h2>
+            <span class="pill blue">{{ lista_efectivo|length }}</span>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Hora</th>
+                  <th>Cliente</th>
+                  <th>Teléfono</th>
+                  <th>Cancha</th>
+                  <th>Tipo</th>
+                  <th>Método</th>
+                  <th>Monto</th>
+                  <th>Estado</th>
+                  <th>Pago</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {% if lista_efectivo %}
+                  {% for r in lista_efectivo %}
+                    <tr>
+                      <td>{{ r.fecha | fecha_latina }}</td>
+                      <td>{{ r.hora }}</td>
+                      <td>{{ r.nombre }}</td>
+                      <td>{{ r.telefono }}</td>
+                      <td>{{ r.cancha_nombre }}</td>
+                      <td>{{ r.cancha_tipo }}</td>
+                      <td>{{ r.metodo_pago }}</td>
+                      <td>{{ r.monto | colones }}</td>
+                      <td>
+                        {% if r.estado == "Cancelada" %}
+                          <span class="pill bad">Cancelada</span>
+                        {% else %}
+                          <span class="pill ok">Reservada</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if r.estado == "Cancelada" %}
+                          —
+                        {% elif r.pagado %}
+                          <span class="pill ok">Pagado</span>
+                        {% else %}
+                          <span class="pill bad">Pendiente</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr><td colspan="10">No hay reservas en Efectivo con esos filtros.</td></tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+</body>
+</html>

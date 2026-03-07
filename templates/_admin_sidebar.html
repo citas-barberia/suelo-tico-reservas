@@ -1,0 +1,31 @@
+<aside class="admin-sidebar">
+  <div class="admin-brand">
+    <div class="brand-mark">ST</div>
+    <div class="brand-text">
+      <div class="brand-name">SUELO TICO</div>
+      <div class="brand-sub">ADMIN PANEL</div>
+    </div>
+  </div>
+
+  <nav class="admin-nav">
+    <a class="admin-link {% if request.endpoint == 'admin_retos' %}active{% endif %}" href="{{ url_for('admin_retos') }}">
+      🏆 Retos
+    </a>
+
+    <a class="admin-link {% if request.endpoint == 'admin' %}active{% endif %}" href="{{ url_for('admin') }}">
+      📋 Operación
+    </a>
+
+    <a class="admin-link {% if request.endpoint == 'admin_agenda' %}active{% endif %}" href="{{ url_for('admin_agenda') }}">
+      🧾 Agenda
+    </a>
+
+    <a class="admin-link {% if request.endpoint == 'admin_historial' %}active{% endif %}" href="{{ url_for('admin_historial') }}">
+      📚 Historial
+    </a>
+  </nav>
+
+  <div class="admin-sidebar-footer">
+    <a class="admin-logout" href="{{ url_for('logout_admin') }}">🚪 Cerrar sesión</a>
+  </div>
+</aside>

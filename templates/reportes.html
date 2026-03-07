@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suelo Tico · Historial y Reportes</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+        <h1>📊 Historial y Reportes Mensuales</h1>
+        <a href="{{ url_for('admin') }}" class="btn-secundario">⬅ Volver al Panel Diario</a>
+    </div>
+
+    <div class="card" style="margin-bottom: 30px; border-left: 5px solid var(--green);">
+        <div class="section-title"><h2>🗓️ Cierre de Mes ({{ resumen_mes.mes }}/{{ resumen_mes.anio }})</h2></div>
+        <div class="stats-grid">
+            <div class="stat-box"><span>Total Recaudado</span><strong>{{ resumen_mes.dinero | colones }}</strong></div>
+            <div class="stat-box"><span>Reservas Exitosas</span><strong>{{ resumen_mes.reservadas }}</strong></div>
+            <div class="stat-box"><span>Vía SINPE</span><strong>{{ resumen_mes.sinpe }}</strong></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="section-title"><h2>🔎 Buscador Histórico</h2></div>
+        <form method="GET" action="{{ url_for('reportes_mensuales') }}" style="display:grid; grid-template-columns: 1fr 1fr auto; gap:10px; margin-bottom:20px;">
+            <input type="date" name="fecha">
+            <select name="cancha">
+                <option value="">Todas las canchas</option>
+                <option value="1">Cancha 1</option>
+                <option value="2">Cancha 2</option>
+            </select>
+            <button type="submit">Buscar</button>
+        </form>
+
+        <div class="tabla-wrap" style="max-height: 600px; overflow-y: auto;">
+            <table class="tabla-compacta">
+                <thead>
+                    <tr><th>Fecha</th><th>Hora</th><th>Cliente</th><th>Cancha</th><th>Monto</th><th>Estado</th></tr>
+                </thead>
+                <tbody>
+                    {% for r in todas_las_reservas | sort(attribute='fecha', reverse=True) %}
+                    <tr>
+                        <td>{{ r.fecha | fecha_latina }}</td>
+                        <td>{{ r.hora }}</td>
+                        <td>{{ r.nombre }}</td>
+                        <td>{{ r.cancha_nombre }}</td>
+                        <td>{{ r.monto | colones }}</td>
+                        <td>{{ r.estado }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+  </div>
+</body>
+</html>
