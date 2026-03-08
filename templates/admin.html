@@ -118,14 +118,14 @@
               {% if reservas_dia_activas %}
                 {% for r in reservas_dia_activas %}
                   <tr>
-                    <td>{{ r.hora }}</td>
-                    <td>{{ r.nombre }}</td>
-                    <td>{{ r.telefono }}</td>
-                    <td>{{ r.cancha_nombre }}</td>
-                    <td>{{ r.cancha_tipo }}</td>
-                    <td>{{ r.metodo_pago }}</td>
-                    <td>{{ r.monto | colones }}</td>
-                    <td>
+                    <td data-label="Hora">{{ r.hora }}</td>
+                    <td data-label="Cliente">{{ r.nombre }}</td>
+                    <td data-label="Teléfono">{{ r.telefono }}</td>
+                    <td data-label="Cancha">{{ r.cancha_nombre }}</td>
+                    <td data-label="Tipo">{{ r.cancha_tipo }}</td>
+                    <td data-label="Método">{{ r.metodo_pago }}</td>
+                    <td data-label="Monto">{{ r.monto | colones }}</td>
+                    <td data-label="Pago">
                       {% if r.pagado %}
                         <span class="pill ok">Pagado</span>
                       {% elif r.metodo_pago == "SINPE" and r.sinpe_reportado_cliente %}
@@ -134,7 +134,7 @@
                         <span class="pill bad">Pendiente</span>
                       {% endif %}
                     </td>
-                    <td>
+                    <td data-label="Acción">
                       {% if not r.pagado %}
                         <a class="btn primary" href="{{ url_for('confirmar_pago_admin', reserva_id=r.id) }}">
                           Confirmar pago
@@ -147,7 +147,7 @@
                 {% endfor %}
               {% else %}
                 <tr>
-                  <td colspan="9">No hay reservas activas hoy.</td>
+                  <td data-label="Reservas" colspan="9">No hay reservas activas hoy.</td>
                 </tr>
               {% endif %}
             </tbody>
@@ -180,19 +180,19 @@
               {% if canceladas_dia %}
                 {% for r in canceladas_dia %}
                   <tr>
-                    <td>{{ r.hora }}</td>
-                    <td>{{ r.nombre }}</td>
-                    <td>{{ r.telefono }}</td>
-                    <td>{{ r.cancha_nombre }}</td>
-                    <td>{{ r.cancha_tipo }}</td>
-                    <td>{{ r.metodo_pago or "—" }}</td>
-                    <td>{{ r.monto | colones }}</td>
-                    <td><span class="pill bad">Cancelada</span></td>
+                    <td data-label="Hora">{{ r.hora }}</td>
+                    <td data-label="Cliente">{{ r.nombre }}</td>
+                    <td data-label="Teléfono">{{ r.telefono }}</td>
+                    <td data-label="Cancha">{{ r.cancha_nombre }}</td>
+                    <td data-label="Tipo">{{ r.cancha_tipo }}</td>
+                    <td data-label="Método">{{ r.metodo_pago or "—" }}</td>
+                    <td data-label="Monto">{{ r.monto | colones }}</td>
+                    <td data-label="Estado"><span class="pill bad">Cancelada</span></td>
                   </tr>
                 {% endfor %}
               {% else %}
                 <tr>
-                  <td colspan="8">No hay cancelaciones hoy.</td>
+                  <td data-label="Cancelaciones" colspan="8">No hay cancelaciones hoy.</td>
                 </tr>
               {% endif %}
             </tbody>
