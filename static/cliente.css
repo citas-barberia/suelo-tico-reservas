@@ -1039,3 +1039,221 @@ select option {
   -webkit-box-shadow: 0 0 0px 1000px #0b1220 inset !important;
   transition: background-color 9999s ease-in-out 0s;
 }
+/* =========================================
+   ADMIN MOBILE PRO
+   Sidebar arriba en celular
+   ========================================= */
+
+@media (max-width: 860px){
+
+  .admin-shell{
+    display: block;
+  }
+
+  .admin-sidebar{
+    display: block !important;
+    position: relative;
+    top: 0;
+    height: auto;
+    overflow: visible;
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    padding: 14px 12px;
+    margin-bottom: 12px;
+    border-radius: 0 0 18px 18px;
+  }
+
+  .brand{
+    padding: 4px 4px 12px;
+  }
+
+  .admin-nav{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 0;
+  }
+
+  .admin-link{
+    min-height: 52px;
+    justify-content: flex-start;
+    padding: 12px;
+    border-radius: 14px;
+    font-size: 14px;
+  }
+
+  .sidebar-footer{
+    padding: 12px 0 0;
+  }
+
+  .admin-logout{
+    display: block;
+    text-align: center;
+  }
+
+  .admin-main{
+    padding: 12px;
+  }
+
+  .admin-topbar{
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .search{
+    max-width: 100%;
+  }
+
+  .top-actions{
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .user-pill{
+    flex: 1;
+    min-width: 180px;
+  }
+
+  .page-head h1{
+    font-size: 26px;
+    line-height: 1.1;
+  }
+
+  .page-head p{
+    font-size: 14px;
+  }
+
+  .kpis{
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .admin-card{
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .title-row{
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 8px;
+  }
+
+  .form-grid{
+    grid-template-columns: 1fr;
+  }
+
+  .btn-row{
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .btn-row .btn,
+  .btn-row button,
+  .actions .btn{
+    width: 100%;
+  }
+
+  .reto-item{
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .reto-left{
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .reto-right{
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .actions{
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .table-wrap{
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 14px;
+  }
+
+  table{
+    min-width: 760px;
+  }
+}
+
+@media (max-width: 520px){
+
+  .admin-sidebar{
+    padding: 12px 10px;
+  }
+
+  .brand-mark{
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .brand-txt .name{
+    font-size: 14px;
+  }
+
+  .brand-txt .sub{
+    font-size: 11px;
+  }
+
+  .admin-nav{
+    grid-template-columns: 1fr;
+  }
+
+  .admin-link{
+    font-size: 13px;
+    padding: 11px 12px;
+  }
+
+  .page-head h1{
+    font-size: 22px;
+  }
+
+  .page-head p{
+    font-size: 13px;
+  }
+
+  .kpi .val{
+    font-size: 22px;
+  }
+
+  .admin-card h2{
+    font-size: 16px;
+  }
+
+  input, select, textarea{
+    font-size: 14px;
+    padding: 11px 12px;
+  }
+
+  .pill{
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+
+  .icon-btn{
+    width: 38px;
+    height: 38px;
+  }
+
+  .user-avatar{
+    width: 32px;
+    height: 32px;
+  }
+}
