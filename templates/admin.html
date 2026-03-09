@@ -30,7 +30,13 @@
 
     <!-- MAIN -->
     <main class="admin-main">
-
+<!-- MOBILE NAV -->
+<div class="admin-mobile-nav">
+  <a class="admin-mobile-link active" href="{{ url_for('admin') }}">Operación</a>
+  <a class="admin-mobile-link" href="{{ url_for('admin_agenda') }}">Calendario</a>
+  <a class="admin-mobile-link" href="{{ url_for('admin_retos') }}">Retos</a>
+  <a class="admin-mobile-link" href="{{ url_for('admin_historial') }}">Reportes</a>
+</div>
       <!-- TOPBAR -->
       <div class="admin-topbar">
         <div class="search">
