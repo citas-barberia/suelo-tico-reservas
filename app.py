@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 from urllib.parse import quote_plus
 from zoneinfo import ZoneInfo
+from supabase import create_client, Client
 
 app = Flask(__name__)
 
@@ -30,6 +31,17 @@ NUMERO_SINPE = "8888-8888"
 ADMIN_USUARIO = os.getenv("ADMIN_USUARIO", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "1234")
 
+# SUPABASE
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase: Client | None = None
+
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception:
+        supabase = None
+
 CANCHAS = [
     {"id": 1, "nombre": "Cancha 1", "tipo": "Fútbol 5"},
     {"id": 2, "nombre": "Cancha 2", "tipo": "Fútbol 7"},
@@ -53,8 +65,12 @@ def hoy_cr_iso():
     return ahora_cr().date().isoformat()
 
 
+def supabase_activo():
+    return supabase is not None
+
+
 # ==========================
-# UTILIDADES JSON
+# UTILIDADES JSON / FALLBACK
 # ==========================
 def leer_json_lista(path):
     if not os.path.exists(path):
@@ -80,37 +96,163 @@ def siguiente_id(lista):
     return max(int(x.get("id", 0)) for x in lista) + 1
 
 
+def sb_select_all(tabla):
+    if not supabase_activo():
+        return []
+
+    try:
+        resp = supabase.table(tabla).select("*").execute()
+        return resp.data or []
+    except Exception as e:
+        print(f"Error leyendo {tabla} desde Supabase: {e}")
+        return []
+
+
+def sb_insert(tabla, data):
+    if not supabase_activo():
+        return None
+
+    try:
+        resp = supabase.table(tabla).insert(data).execute()
+        if resp.data:
+            return resp.data[0]
+        return None
+    except Exception as e:
+        print(f"Error insertando en {tabla}: {e}")
+        return None
+
+
+def sb_update(tabla, row_id, data):
+    if not supabase_activo():
+        return None
+
+    try:
+        resp = supabase.table(tabla).update(data).eq("id", row_id).execute()
+        if resp.data:
+            return resp.data[0]
+        return None
+    except Exception as e:
+        print(f"Error actualizando {tabla} id={row_id}: {e}")
+        return None
+
+
 # ==========================
 # RESERVAS
 # ==========================
 def leer_reservas():
-    reservas = leer_json_lista(ARCHIVO_RESERVAS)
+    if supabase_activo():
+        reservas = sb_select_all("reservas")
+    else:
+        reservas = leer_json_lista(ARCHIVO_RESERVAS)
+
     for r in reservas:
         if "pagado" not in r:
             r["pagado"] = False
         if "sinpe_reportado_cliente" not in r:
             r["sinpe_reportado_cliente"] = False
-        if "estado" not in r:
+        if "estado" not in r or not r.get("estado"):
             r["estado"] = "Reservada"
-        if "monto" not in r:
+        if "monto" not in r or r.get("monto") is None:
             r["monto"] = 0
-        if "origen" not in r:
+        if "origen" not in r or not r.get("origen"):
             r["origen"] = "Reserva"
+        if "nota_reto" not in r:
+            r["nota_reto"] = ""
+
     return reservas
 
 
-def guardar_reservas(reservas):
+def insertar_reserva(reserva_data):
+    payload = {
+        "nombre": reserva_data.get("nombre"),
+        "telefono": reserva_data.get("telefono"),
+        "fecha": reserva_data.get("fecha"),
+        "cancha_id": reserva_data.get("cancha_id"),
+        "cancha_nombre": reserva_data.get("cancha_nombre"),
+        "cancha_tipo": reserva_data.get("cancha_tipo"),
+        "hora": reserva_data.get("hora"),
+        "monto": reserva_data.get("monto", 0),
+        "metodo_pago": reserva_data.get("metodo_pago"),
+        "pagado": reserva_data.get("pagado", False),
+        "sinpe_reportado_cliente": reserva_data.get("sinpe_reportado_cliente", False),
+        "estado": reserva_data.get("estado", "Reservada"),
+        "fecha_creacion": reserva_data.get("fecha_creacion"),
+        "origen": reserva_data.get("origen", "Reserva"),
+        "nota_reto": reserva_data.get("nota_reto", ""),
+        "reto_id": reserva_data.get("reto_id"),
+        "fecha_pago_confirmado": reserva_data.get("fecha_pago_confirmado"),
+        "fecha_sinpe_reportado": reserva_data.get("fecha_sinpe_reportado"),
+    }
+
+    if supabase_activo():
+        creada = sb_insert("reservas", payload)
+        if creada:
+            return creada
+        raise Exception("No se pudo insertar la reserva en Supabase.")
+
+    reservas = leer_json_lista(ARCHIVO_RESERVAS)
+    reserva_data["id"] = siguiente_id(reservas)
+    reservas.append(reserva_data)
     guardar_json_lista(ARCHIVO_RESERVAS, reservas)
+    return reserva_data
+
+
+def actualizar_reserva(reserva_id, cambios):
+    if supabase_activo():
+        actualizada = sb_update("reservas", reserva_id, cambios)
+        if actualizada:
+            return actualizada
+        return None
+
+    reservas = leer_json_lista(ARCHIVO_RESERVAS)
+    for r in reservas:
+        if int(r.get("id", 0)) == int(reserva_id):
+            r.update(cambios)
+            guardar_json_lista(ARCHIVO_RESERVAS, reservas)
+            return r
+    return None
 
 
 def leer_eventos():
-    eventos = leer_json_lista(ARCHIVO_EVENTOS)
+    if supabase_activo():
+        eventos = sb_select_all("eventos")
+    else:
+        eventos = leer_json_lista(ARCHIVO_EVENTOS)
+
     eventos.sort(key=lambda e: e.get("fecha_evento", ""), reverse=True)
     return eventos
 
 
-def guardar_eventos(eventos):
+def insertar_evento(evento):
+    payload = {
+        "tipo": evento.get("tipo"),
+        "titulo": evento.get("titulo"),
+        "descripcion": evento.get("descripcion"),
+        "fecha": evento.get("fecha"),
+        "hora": evento.get("hora"),
+        "fecha_evento": evento.get("fecha_evento"),
+        "fecha_evento_latina": evento.get("fecha_evento_latina"),
+        "mensaje": evento.get("mensaje"),
+        "cliente_nombre": evento.get("cliente_nombre"),
+        "cliente_telefono": evento.get("cliente_telefono"),
+        "cancha_nombre": evento.get("cancha_nombre"),
+        "cancha_tipo": evento.get("cancha_tipo"),
+        "fecha_reserva": evento.get("fecha_reserva"),
+        "metodo_pago": evento.get("metodo_pago"),
+        "monto": evento.get("monto", 0),
+    }
+
+    if supabase_activo():
+        creada = sb_insert("eventos", payload)
+        if creada:
+            return creada
+        return None
+
+    eventos = leer_json_lista(ARCHIVO_EVENTOS)
+    evento["id"] = siguiente_id(eventos)
+    eventos.append(evento)
     guardar_json_lista(ARCHIVO_EVENTOS, eventos)
+    return evento
 
 
 def formatear_fecha_latina(fecha_iso):
@@ -192,37 +334,131 @@ def obtener_precio_por_hora(hora):
 # RETOS
 # ==========================
 def leer_retos():
-    retos = leer_json_lista(ARCHIVO_RETOS)
+    if supabase_activo():
+        retos = sb_select_all("retos")
+    else:
+        retos = leer_json_lista(ARCHIVO_RETOS)
+
     for r in retos:
-        if "estado" not in r:
+        if "estado" not in r or not r.get("estado"):
             r["estado"] = "Activo"
-        if "cupo" not in r:
+        if "cupo" not in r or r.get("cupo") is None:
             r["cupo"] = 10
-        if "precio" not in r:
+        if "precio" not in r or r.get("precio") is None:
             r["precio"] = 0
-        if "descripcion" not in r:
+        if "descripcion" not in r or r.get("descripcion") is None:
             r["descripcion"] = ""
+
     return retos
 
 
-def guardar_retos(retos):
+def insertar_reto(reto):
+    payload = {
+        "fecha": reto.get("fecha"),
+        "hora": reto.get("hora"),
+        "cancha_id": reto.get("cancha_id"),
+        "cancha_nombre": reto.get("cancha_nombre"),
+        "tipo": reto.get("tipo"),
+        "precio": reto.get("precio", 0),
+        "cupo": reto.get("cupo", 10),
+        "descripcion": reto.get("descripcion", ""),
+        "estado": reto.get("estado", "Activo"),
+        "fecha_creacion": reto.get("fecha_creacion"),
+        "fecha_cierre": reto.get("fecha_cierre"),
+        "fecha_cierre_auto": reto.get("fecha_cierre_auto"),
+    }
+
+    if supabase_activo():
+        creado = sb_insert("retos", payload)
+        if creado:
+            return creado
+        raise Exception("No se pudo insertar el reto en Supabase.")
+
+    retos = leer_json_lista(ARCHIVO_RETOS)
+    reto["id"] = siguiente_id(retos)
+    retos.append(reto)
     guardar_json_lista(ARCHIVO_RETOS, retos)
+    return reto
+
+
+def actualizar_reto(reto_id, cambios):
+    if supabase_activo():
+        actualizado = sb_update("retos", reto_id, cambios)
+        if actualizado:
+            return actualizado
+        return None
+
+    retos = leer_json_lista(ARCHIVO_RETOS)
+    for r in retos:
+        if int(r.get("id", 0)) == int(reto_id):
+            r.update(cambios)
+            guardar_json_lista(ARCHIVO_RETOS, retos)
+            return r
+    return None
 
 
 def leer_solicitudes_retos():
-    sol = leer_json_lista(ARCHIVO_SOLICITUDES_RETOS)
+    if supabase_activo():
+        sol = sb_select_all("solicitudes_retos")
+    else:
+        sol = leer_json_lista(ARCHIVO_SOLICITUDES_RETOS)
+
     for s in sol:
-        if "estado" not in s:
+        if "estado" not in s or not s.get("estado"):
             s["estado"] = "Pendiente"
-        if "nota" not in s:
+        if "nota" not in s or s.get("nota") is None:
             s["nota"] = ""
-        if "tipo" not in s:
+        if "tipo" not in s or not s.get("tipo"):
             s["tipo"] = "Publicado"
+
     return sol
 
 
-def guardar_solicitudes_retos(sol):
-    guardar_json_lista(ARCHIVO_SOLICITUDES_RETOS, sol)
+def insertar_solicitud_reto(solicitud):
+    payload = {
+        "tipo": solicitud.get("tipo", "Publicado"),
+        "reto_id": solicitud.get("reto_id"),
+        "fecha": solicitud.get("fecha"),
+        "hora": solicitud.get("hora"),
+        "cancha_id": solicitud.get("cancha_id"),
+        "nombre": solicitud.get("nombre"),
+        "nombre_equipo": solicitud.get("nombre") or solicitud.get("nombre_equipo"),
+        "telefono": solicitud.get("telefono"),
+        "metodo_pago": solicitud.get("metodo_pago"),
+        "nota": solicitud.get("nota", ""),
+        "mensaje": solicitud.get("nota", "") or solicitud.get("mensaje"),
+        "estado": solicitud.get("estado", "Pendiente"),
+        "fecha_creacion": solicitud.get("fecha_creacion"),
+        "reserva_id": solicitud.get("reserva_id"),
+    }
+
+    if supabase_activo():
+        creada = sb_insert("solicitudes_retos", payload)
+        if creada:
+            return creada
+        raise Exception("No se pudo insertar la solicitud en Supabase.")
+
+    solicitudes = leer_json_lista(ARCHIVO_SOLICITUDES_RETOS)
+    solicitud["id"] = siguiente_id(solicitudes)
+    solicitudes.append(solicitud)
+    guardar_json_lista(ARCHIVO_SOLICITUDES_RETOS, solicitudes)
+    return solicitud
+
+
+def actualizar_solicitud_reto(sol_id, cambios):
+    if supabase_activo():
+        actualizada = sb_update("solicitudes_retos", sol_id, cambios)
+        if actualizada:
+            return actualizada
+        return None
+
+    solicitudes = leer_json_lista(ARCHIVO_SOLICITUDES_RETOS)
+    for s in solicitudes:
+        if int(s.get("id", 0)) == int(sol_id):
+            s.update(cambios)
+            guardar_json_lista(ARCHIVO_SOLICITUDES_RETOS, solicitudes)
+            return s
+    return None
 
 
 def normalizar_tel(tel):
@@ -262,16 +498,16 @@ def reto_ya_paso(fecha_iso, hora_texto):
 
 def autocerrar_retos():
     retos = leer_retos()
-    cambio = False
 
     for r in retos:
         if r.get("estado") == "Activo" and reto_ya_paso(r.get("fecha", ""), r.get("hora", "")):
-            r["estado"] = "Cerrado"
-            r["fecha_cierre_auto"] = ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
-            cambio = True
-
-    if cambio:
-        guardar_retos(retos)
+            actualizar_reto(
+                r.get("id"),
+                {
+                    "estado": "Cerrado",
+                    "fecha_cierre_auto": ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
+                }
+            )
 
 
 # ==========================
@@ -369,7 +605,6 @@ def _filtrar_reservas(reservas, fecha_filtro="", cancha_filtro="", busqueda=""):
 
 
 def registrar_evento(tipo, reserva):
-    eventos = leer_json_lista(ARCHIVO_EVENTOS)
     ahora = ahora_cr()
 
     if tipo == "reserva":
@@ -389,8 +624,11 @@ def registrar_evento(tipo, reserva):
         )
 
     evento = {
-        "id": (max([int(e.get("id", 0)) for e in eventos], default=0) + 1),
         "tipo": tipo,
+        "titulo": None,
+        "descripcion": None,
+        "fecha": None,
+        "hora": reserva.get("hora"),
         "fecha_evento": ahora.strftime("%Y-%m-%d %H:%M:%S"),
         "fecha_evento_latina": f"{ahora.day}/{ahora.month}/{ahora.year} {ahora.strftime('%I:%M %p')}".lower(),
         "mensaje": mensaje,
@@ -399,12 +637,11 @@ def registrar_evento(tipo, reserva):
         "cancha_nombre": reserva.get("cancha_nombre"),
         "cancha_tipo": reserva.get("cancha_tipo"),
         "fecha_reserva": reserva.get("fecha"),
-        "hora": reserva.get("hora"),
         "metodo_pago": reserva.get("metodo_pago"),
         "monto": reserva.get("monto", 0),
     }
-    eventos.append(evento)
-    guardar_eventos(eventos)
+
+    insertar_evento(evento)
 
 
 def crear_reserva_desde_reto(fecha, hora, cancha_id, nombre, telefono, metodo_pago, monto, nota, origen="Reto", reto_id=None):
@@ -415,9 +652,7 @@ def crear_reserva_desde_reto(fecha, hora, cancha_id, nombre, telefono, metodo_pa
     if not cancha_info:
         return None, "Cancha inválida."
 
-    reservas = leer_reservas()
     nueva = {
-        "id": (max([int(r.get("id", 0)) for r in reservas], default=0) + 1),
         "nombre": nombre,
         "telefono": telefono,
         "fecha": fecha,
@@ -438,10 +673,9 @@ def crear_reserva_desde_reto(fecha, hora, cancha_id, nombre, telefono, metodo_pa
     if reto_id is not None:
         nueva["reto_id"] = int(reto_id)
 
-    reservas.append(nueva)
-    guardar_reservas(reservas)
-    registrar_evento("reserva", nueva)
-    return nueva, ""
+    creada = insertar_reserva(nueva)
+    registrar_evento("reserva", creada)
+    return creada, ""
 
 
 # ==========================
@@ -468,6 +702,8 @@ def advertencias_seguridad_inicio():
         print("⚠️ ADVERTENCIA: APP_SECRET_KEY por defecto (solo desarrollo).")
     if ADMIN_USUARIO == "admin" and ADMIN_PASSWORD == "1234":
         print("⚠️ ADVERTENCIA: ADMIN_USUARIO / ADMIN_PASSWORD por defecto.")
+    if not supabase_activo():
+        print("⚠️ ADVERTENCIA: Supabase no está activo. Se usará fallback local.")
 
 
 # ==========================
@@ -545,7 +781,6 @@ def index():
             mensaje = "Esa hora ya está ocupada (por reserva o por reto)."
             tipo_mensaje = "error"
         else:
-            reservas = leer_reservas()
             cancha_info = next((c for c in CANCHAS if c["id"] == int(cancha_id)), None)
 
             if not cancha_info:
@@ -555,7 +790,6 @@ def index():
                 monto = obtener_precio_por_hora(hora)
 
                 nueva = {
-                    "id": (max([int(r.get("id", 0)) for r in reservas], default=0) + 1),
                     "nombre": nombre,
                     "telefono": telefono,
                     "fecha": fecha,
@@ -572,13 +806,11 @@ def index():
                     "origen": "Reserva"
                 }
 
-                reservas.append(nueva)
-                guardar_reservas(reservas)
-                registrar_evento("reserva", nueva)
+                reserva_creada = insertar_reserva(nueva)
+                registrar_evento("reserva", reserva_creada)
 
                 mensaje = f"Reserva confirmada. {cancha_info['nombre']} el {formatear_fecha_latina(fecha)} a las {hora}. Monto: {colones_filter(monto)}"
                 tipo_mensaje = "success"
-                reserva_creada = nueva
 
                 msg_wa = (
                     "✅ Reserva confirmada\n"
@@ -593,10 +825,10 @@ def index():
 
                 texto_confirm = (
                     "✅ Reserva confirmada\n"
-                    f"Cancha: {nueva.get('cancha_nombre')} ({nueva.get('cancha_tipo')})\n"
-                    f"Fecha: {fecha_larga_filter(nueva.get('fecha'))}\n"
-                    f"Hora: {nueva.get('hora')}\n"
-                    f"Monto: {colones_filter(nueva.get('monto'))}\n\n"
+                    f"Cancha: {reserva_creada.get('cancha_nombre')} ({reserva_creada.get('cancha_tipo')})\n"
+                    f"Fecha: {fecha_larga_filter(reserva_creada.get('fecha'))}\n"
+                    f"Hora: {reserva_creada.get('hora')}\n"
+                    f"Monto: {colones_filter(reserva_creada.get('monto'))}\n\n"
                     "Si cancelas avisa con tiempo. Solo vuelve a ingresar al link y le das click al botón de cancelar.\n\n"
                     "Gracias por elegirnos."
                 )
@@ -700,12 +932,11 @@ def solicitar_reto_publicado(reto_id):
     tel_norm = normalizar_tel(telefono)
 
     for s in solicitudes:
-        if s.get("tipo") == "Publicado" and int(s.get("reto_id", 0)) == reto_id:
+        if s.get("tipo") == "Publicado" and int(s.get("reto_id", 0) or 0) == reto_id:
             if normalizar_tel(s.get("telefono", "")) == tel_norm and s.get("estado") in {"Pendiente", "Aceptada"}:
                 return redirect(url_for("retos_publicos", aviso="Ya enviaste solicitud para este reto."))
 
     nueva = {
-        "id": siguiente_id(solicitudes),
         "tipo": "Publicado",
         "reto_id": reto_id,
         "nombre": nombre,
@@ -715,8 +946,7 @@ def solicitar_reto_publicado(reto_id):
         "estado": "Pendiente",
         "fecha_creacion": ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
     }
-    solicitudes.append(nueva)
-    guardar_solicitudes_retos(solicitudes)
+    insertar_solicitud_reto(nueva)
 
     return redirect(url_for("retos_publicos", aviso="✅ Solicitud enviada. El dueño la revisará."))
 
@@ -755,7 +985,6 @@ def solicitar_reto_personalizado():
                 return redirect(url_for("retos_publicos", aviso="Ya pediste un reto similar. Espera respuesta del dueño."))
 
     nueva = {
-        "id": siguiente_id(solicitudes),
         "tipo": "Personalizado",
         "reto_id": None,
         "fecha": fecha,
@@ -768,8 +997,7 @@ def solicitar_reto_personalizado():
         "estado": "Pendiente",
         "fecha_creacion": ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
     }
-    solicitudes.append(nueva)
-    guardar_solicitudes_retos(solicitudes)
+    insertar_solicitud_reto(nueva)
 
     return redirect(url_for("retos_publicos", aviso="✅ Solicitud de reto enviada. El dueño la revisará."))
 
@@ -1104,7 +1332,7 @@ def admin_retos():
 
     solicitudes_por_reto = {}
     for s in solicitudes_publicadas:
-        rid = int(s.get("reto_id", 0))
+        rid = int(s.get("reto_id", 0) or 0)
         solicitudes_por_reto.setdefault(rid, []).append(s)
 
     for rid, lista in solicitudes_por_reto.items():
@@ -1158,9 +1386,7 @@ def admin_crear_reto():
     if not cancha_info:
         return redirect(url_for("admin_retos", aviso="Cancha inválida."))
 
-    retos = leer_retos()
     nuevo = {
-        "id": siguiente_id(retos),
         "fecha": fecha,
         "hora": hora,
         "cancha_id": int(cancha_id),
@@ -1172,8 +1398,7 @@ def admin_crear_reto():
         "estado": "Activo",
         "fecha_creacion": ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
     }
-    retos.append(nuevo)
-    guardar_retos(retos)
+    insertar_reto(nuevo)
 
     return redirect(url_for("admin_retos", aviso="✅ Reto creado."))
 
@@ -1183,17 +1408,15 @@ def admin_cerrar_reto(reto_id):
     if not admin_requerido():
         return redirect(url_for("login_admin"))
 
-    retos = leer_retos()
-    aviso = "No se encontró el reto."
+    reto = actualizar_reto(
+        reto_id,
+        {
+            "estado": "Cerrado",
+            "fecha_cierre": ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
+        }
+    )
 
-    for r in retos:
-        if int(r.get("id", 0)) == reto_id:
-            r["estado"] = "Cerrado"
-            r["fecha_cierre"] = ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
-            aviso = "✅ Reto cerrado."
-            break
-
-    guardar_retos(retos)
+    aviso = "✅ Reto cerrado." if reto else "No se encontró el reto."
     return redirect(url_for("admin_retos", aviso=aviso))
 
 
@@ -1213,15 +1436,14 @@ def admin_accion_solicitud(sol_id, accion):
         return redirect(url_for("admin_retos", aviso="Acción inválida."))
 
     if accion == "rechazar":
-        sol["estado"] = "Rechazada"
-        guardar_solicitudes_retos(solicitudes)
+        actualizar_solicitud_reto(sol_id, {"estado": "Rechazada"})
         return redirect(url_for("admin_retos", aviso="✅ Solicitud rechazada."))
 
     if sol.get("estado") != "Pendiente":
         return redirect(url_for("admin_retos", aviso="Esa solicitud ya fue procesada."))
 
     if sol.get("tipo") == "Publicado":
-        reto_id = int(sol.get("reto_id", 0))
+        reto_id = int(sol.get("reto_id", 0) or 0)
         reto = next((r for r in retos if int(r.get("id", 0)) == reto_id), None)
 
         if not reto or reto.get("estado") != "Activo":
@@ -1243,17 +1465,20 @@ def admin_accion_solicitud(sol_id, accion):
         if not reserva:
             return redirect(url_for("admin_retos", aviso=f"No se pudo crear la reserva del reto: {err}"))
 
-        sol["estado"] = "Aceptada"
-        reto["estado"] = "Cerrado"
-        reto["fecha_cierre"] = ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
+        actualizar_solicitud_reto(sol_id, {"estado": "Aceptada"})
+        actualizar_reto(
+            reto_id,
+            {
+                "estado": "Cerrado",
+                "fecha_cierre": ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
+            }
+        )
 
         for s in solicitudes:
-            if s.get("tipo") == "Publicado" and int(s.get("reto_id", 0)) == reto_id and int(s.get("id", 0)) != sol_id:
+            if s.get("tipo") == "Publicado" and int(s.get("reto_id", 0) or 0) == reto_id and int(s.get("id", 0)) != sol_id:
                 if s.get("estado") == "Pendiente":
-                    s["estado"] = "Rechazada"
+                    actualizar_solicitud_reto(s.get("id"), {"estado": "Rechazada"})
 
-        guardar_solicitudes_retos(solicitudes)
-        guardar_retos(retos)
         return redirect(url_for("admin_retos", aviso="✅ Solicitud aceptada y reto convertido en reserva (con pagos)."))
 
     fecha = sol.get("fecha")
@@ -1276,9 +1501,13 @@ def admin_accion_solicitud(sol_id, accion):
     if not reserva:
         return redirect(url_for("admin_retos", aviso=f"No se pudo crear la reserva del reto: {err}"))
 
-    sol["estado"] = "Aceptada"
-    sol["reserva_id"] = reserva.get("id")
-    guardar_solicitudes_retos(solicitudes)
+    actualizar_solicitud_reto(
+        sol_id,
+        {
+            "estado": "Aceptada",
+            "reserva_id": reserva.get("id")
+        }
+    )
 
     return redirect(url_for("admin_retos", aviso="✅ Reto personalizado aceptado y creado como reserva (con pagos)."))
 
@@ -1292,26 +1521,27 @@ def confirmar_pago_admin(reserva_id):
         return redirect(url_for("login_admin"))
 
     reservas = leer_reservas()
+    reserva_actual = next((r for r in reservas if int(r.get("id", 0)) == reserva_id), None)
     reserva_actualizada = None
     aviso = "No se encontró la reserva."
 
-    for r in reservas:
-        if int(r.get("id", 0)) == reserva_id:
-            if r.get("estado") != "Reservada":
-                aviso = "No se puede confirmar pago de una reserva cancelada."
-            elif r.get("pagado") is True:
-                aviso = "Ese pago ya estaba confirmado."
+    if reserva_actual:
+        if reserva_actual.get("estado") != "Reservada":
+            aviso = "No se puede confirmar pago de una reserva cancelada."
+        elif reserva_actual.get("pagado") is True:
+            aviso = "Ese pago ya estaba confirmado."
+        else:
+            if reserva_actual.get("fecha") != hoy_cr_iso():
+                aviso = "El pago solo se puede confirmar el mismo día de la reserva."
             else:
-                if r.get("fecha") != hoy_cr_iso():
-                    aviso = "El pago solo se puede confirmar el mismo día de la reserva."
-                else:
-                    r["pagado"] = True
-                    r["fecha_pago_confirmado"] = ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
-                    reserva_actualizada = r
-                    aviso = "Pago confirmado correctamente."
-            break
-
-    guardar_reservas(reservas)
+                reserva_actualizada = actualizar_reserva(
+                    reserva_id,
+                    {
+                        "pagado": True,
+                        "fecha_pago_confirmado": ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
+                    }
+                )
+                aviso = "Pago confirmado correctamente."
 
     if reserva_actualizada:
         registrar_evento("pago_confirmado", reserva_actualizada)
@@ -1335,21 +1565,23 @@ def marcar_sinpe_reportado_admin(reserva_id):
         return redirect(url_for("login_admin"))
 
     reservas = leer_reservas()
+    reserva_actual = next((r for r in reservas if int(r.get("id", 0)) == reserva_id), None)
     aviso = "No se encontró la reserva."
 
-    for r in reservas:
-        if int(r.get("id", 0)) == reserva_id:
-            if r.get("estado") == "Cancelada":
-                aviso = "No se puede marcar SINPE reportado en una reserva cancelada."
-            elif r.get("metodo_pago") != "SINPE":
-                aviso = "Esta reserva no es por SINPE."
-            else:
-                r["sinpe_reportado_cliente"] = True
-                r["fecha_sinpe_reportado"] = ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
-                aviso = "SINPE reportado por cliente marcado correctamente."
-            break
-
-    guardar_reservas(reservas)
+    if reserva_actual:
+        if reserva_actual.get("estado") == "Cancelada":
+            aviso = "No se puede marcar SINPE reportado en una reserva cancelada."
+        elif reserva_actual.get("metodo_pago") != "SINPE":
+            aviso = "Esta reserva no es por SINPE."
+        else:
+            actualizar_reserva(
+                reserva_id,
+                {
+                    "sinpe_reportado_cliente": True,
+                    "fecha_sinpe_reportado": ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
+                }
+            )
+            aviso = "SINPE reportado por cliente marcado correctamente."
 
     return redirect(url_for(
         "admin_agenda",
@@ -1366,19 +1598,21 @@ def desmarcar_sinpe_reportado_admin(reserva_id):
         return redirect(url_for("login_admin"))
 
     reservas = leer_reservas()
+    reserva_actual = next((r for r in reservas if int(r.get("id", 0)) == reserva_id), None)
     aviso = "No se encontró la reserva."
 
-    for r in reservas:
-        if int(r.get("id", 0)) == reserva_id:
-            if r.get("metodo_pago") != "SINPE":
-                aviso = "Esta reserva no es por SINPE."
-            else:
-                r["sinpe_reportado_cliente"] = False
-                r["fecha_sinpe_reportado"] = None
-                aviso = "SINPE reportado desmarcado correctamente."
-            break
-
-    guardar_reservas(reservas)
+    if reserva_actual:
+        if reserva_actual.get("metodo_pago") != "SINPE":
+            aviso = "Esta reserva no es por SINPE."
+        else:
+            actualizar_reserva(
+                reserva_id,
+                {
+                    "sinpe_reportado_cliente": False,
+                    "fecha_sinpe_reportado": None
+                }
+            )
+            aviso = "SINPE reportado desmarcado correctamente."
 
     return redirect(url_for(
         "admin_agenda",
