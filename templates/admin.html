@@ -4,13 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Suelo Tico · Admin · Operación</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
 <body class="admin-body">
   <div class="admin-shell">
 
-    <!-- SIDEBAR -->
     <aside class="admin-sidebar">
       <div class="brand">
         <div class="brand-mark">ST</div>
@@ -20,27 +22,31 @@
         </div>
       </div>
 
-      {% set active_tab = 'operacion' %}
-      {% include "_admin_tabs.html" with context %}
+      <nav class="admin-nav">
+        <a href="{{ url_for('admin') }}" class="admin-link active">📊 Operación</a>
+        <a href="{{ url_for('admin_agenda') }}" class="admin-link">📅 Calendario</a>
+        <a href="{{ url_for('admin_retos') }}" class="admin-link">🏆 Retos</a>
+        <a href="{{ url_for('admin_historial') }}" class="admin-link">📈 Reportes</a>
+      </nav>
 
       <div class="sidebar-footer">
         <a class="admin-logout" href="{{ url_for('logout_admin') }}">Cerrar sesión</a>
       </div>
     </aside>
 
-    <!-- MAIN -->
     <main class="admin-main">
-<!-- MOBILE NAV -->
-<div class="admin-mobile-nav">
-  <a class="admin-mobile-link active" href="{{ url_for('admin') }}">Operación</a>
-  <a class="admin-mobile-link" href="{{ url_for('admin_agenda') }}">Calendario</a>
-  <a class="admin-mobile-link" href="{{ url_for('admin_retos') }}">Retos</a>
-  <a class="admin-mobile-link" href="{{ url_for('admin_historial') }}">Reportes</a>
-</div>
-      <!-- TOPBAR -->
+      
+      <div class="admin-mobile-nav">
+        <a class="admin-mobile-link active" href="{{ url_for('admin') }}">Operación</a>
+        <a class="admin-mobile-link" href="{{ url_for('admin_agenda') }}">Calendario</a>
+        <a class="admin-mobile-link" href="{{ url_for('admin_retos') }}">Retos</a>
+        <a class="admin-mobile-link" href="{{ url_for('admin_historial') }}">Reportes</a>
+      </div>
+
       <div class="admin-topbar">
         <div class="search">
-          🔎 <input type="text" placeholder="Vista diaria" readonly />
+          <span class="ico">🔎</span> 
+          <input type="text" placeholder="Vista diaria de operación" readonly />
         </div>
 
         <div class="top-actions">
@@ -56,41 +62,28 @@
 
       <div class="page-head">
         <h1>Operación del <span class="accent">día</span></h1>
-        <p>Solo se muestra lo que pasó hoy: reservas, ganancias, pagos y cancelaciones.</p>
+        <p>Resumen en tiempo real de reservas, pagos y cancelaciones.</p>
       </div>
 
-      <!-- KPIs -->
       <div class="kpis">
         <div class="kpi green">
-          <div>
-            <div class="lbl">Ganancia del día</div>
-            <div class="val">{{ resumen_hoy.dinero | colones }}</div>
-          </div>
-          <div class="pill ok">✓</div>
+          <div class="lbl">Ganancia del día</div>
+          <div class="val">{{ resumen_hoy.dinero | colones }}</div>
         </div>
 
         <div class="kpi blue">
-          <div>
-            <div class="lbl">Reservas del día</div>
-            <div class="val">{{ resumen_hoy.reservadas }}</div>
-          </div>
-          <div class="pill blue">●</div>
+          <div class="lbl">Reservas del día</div>
+          <div class="val">{{ resumen_hoy.reservadas }}</div>
         </div>
 
         <div class="kpi orange">
-          <div>
-            <div class="lbl">Pagos confirmados</div>
-            <div class="val">{{ resumen_hoy.pagos_confirmados }}</div>
-          </div>
-          <div class="pill warn">!</div>
+          <div class="lbl">Pagos confirmados</div>
+          <div class="val">{{ resumen_hoy.pagos_confirmados }}</div>
         </div>
 
         <div class="kpi red">
-          <div>
-            <div class="lbl">Cancelaciones del día</div>
-            <div class="val">{{ resumen_hoy.canceladas }}</div>
-          </div>
-          <div class="pill bad">×</div>
+          <div class="lbl">Cancelaciones</div>
+          <div class="val">{{ resumen_hoy.canceladas }}</div>
         </div>
       </div>
 
@@ -98,11 +91,10 @@
         <div class="alert success">{{ aviso }}</div>
       {% endif %}
 
-      <!-- RESERVAS ACTIVAS DEL DÍA -->
       <div class="admin-card">
         <div class="title-row">
           <h2>📋 Reservas activas de hoy</h2>
-          <span class="pill blue">{{ reservas_dia_activas|length }} reservas</span>
+          <span class="count-badge">{{ reservas_dia_activas|length }} hoy</span>
         </div>
 
         <div class="table-wrap">
@@ -111,12 +103,9 @@
               <tr>
                 <th>Hora</th>
                 <th>Cliente</th>
-                <th>Teléfono</th>
                 <th>Cancha</th>
-                <th>Tipo</th>
-                <th>Método</th>
                 <th>Monto</th>
-                <th>Pago</th>
+                <th>Estado</th>
                 <th>Acción</th>
               </tr>
             </thead>
@@ -124,12 +113,12 @@
               {% if reservas_dia_activas %}
                 {% for r in reservas_dia_activas %}
                   <tr>
-                    <td data-label="Hora">{{ r.hora }}</td>
-                    <td data-label="Cliente">{{ r.nombre }}</td>
-                    <td data-label="Teléfono">{{ r.telefono }}</td>
-                    <td data-label="Cancha">{{ r.cancha_nombre }}</td>
-                    <td data-label="Tipo">{{ r.cancha_tipo }}</td>
-                    <td data-label="Método">{{ r.metodo_pago }}</td>
+                    <td data-label="Hora"><b>{{ r.hora }}</b></td>
+                    <td data-label="Cliente">
+                        <div class="c-name">{{ r.nombre }}</div>
+                        <div class="c-tel">{{ r.telefono }}</div>
+                    </td>
+                    <td data-label="Cancha">{{ r.cancha_nombre }} <small>({{ r.cancha_tipo }})</small></td>
                     <td data-label="Monto">{{ r.monto | colones }}</td>
                     <td data-label="Pago">
                       {% if r.pagado %}
@@ -146,66 +135,18 @@
                           Confirmar pago
                         </a>
                       {% else %}
-                        <span class="pill">Sin cambios</span>
+                        <span class="txt-ok">✓ Completado</span>
                       {% endif %}
                     </td>
                   </tr>
                 {% endfor %}
               {% else %}
-                <tr>
-                  <td data-label="Reservas" colspan="9">No hay reservas activas hoy.</td>
-                </tr>
+                <tr><td colspan="6" style="text-align:center; padding:40px;">No hay reservas hoy.</td></tr>
               {% endif %}
             </tbody>
           </table>
         </div>
       </div>
-
-      <!-- CANCELACIONES DEL DÍA -->
-      <div class="admin-card">
-        <div class="title-row">
-          <h2>❌ Cancelaciones de hoy</h2>
-          <span class="pill bad">{{ canceladas_dia|length }} canceladas</span>
-        </div>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Hora</th>
-                <th>Cliente</th>
-                <th>Teléfono</th>
-                <th>Cancha</th>
-                <th>Tipo</th>
-                <th>Método</th>
-                <th>Monto</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% if canceladas_dia %}
-                {% for r in canceladas_dia %}
-                  <tr>
-                    <td data-label="Hora">{{ r.hora }}</td>
-                    <td data-label="Cliente">{{ r.nombre }}</td>
-                    <td data-label="Teléfono">{{ r.telefono }}</td>
-                    <td data-label="Cancha">{{ r.cancha_nombre }}</td>
-                    <td data-label="Tipo">{{ r.cancha_tipo }}</td>
-                    <td data-label="Método">{{ r.metodo_pago or "—" }}</td>
-                    <td data-label="Monto">{{ r.monto | colones }}</td>
-                    <td data-label="Estado"><span class="pill bad">Cancelada</span></td>
-                  </tr>
-                {% endfor %}
-              {% else %}
-                <tr>
-                  <td data-label="Cancelaciones" colspan="8">No hay cancelaciones hoy.</td>
-                </tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
     </main>
   </div>
 </body>
