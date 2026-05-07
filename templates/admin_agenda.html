@@ -1,283 +1,224 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Suelo Tico · Agenda</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
+{% set active_tab = 'agenda' %}
+{% set page_title = 'Suelo Tico · Agenda' %}
+{% set page_h1 = 'Agenda y Gestión' %}
+{% set page_subtitle = 'Control de reservas, pagos pendientes y próximas fechas.' %}
+{% set hero_cards = [
+  {'label': 'Pendientes', 'value': resumen_agenda.pendientes_total | default(0)},
+  {'label': 'SINPE pendientes', 'value': resumen_agenda.pendientes_sinpe | default(0)},
+  {'label': 'SINPE reportado', 'value': resumen_agenda.sinpe_reportado | default(0)},
+  {'label': 'Futuras activas', 'value': resumen_agenda.futuras_total | default(0)}
+] %}
 
-<body class="admin-body">
-  <div class="admin-shell">
+{% extends "_admin_layout.html" %}
 
-    <!-- SIDEBAR -->
-    <aside class="admin-sidebar">
-      <div class="brand">
-        <div class="brand-mark">ST</div>
-        <div class="brand-txt">
-          <div class="name">SUELO TICO</div>
-          <div class="sub">ADMIN PANEL</div>
-        </div>
-      </div>
+{% block content %}
 
-      {% set active_tab = 'calendario' %}
-      {% include "_admin_tabs.html" with context %}
+<section class="st-panel">
+  <div class="st-panel-head">
+    <div>
+      <p class="st-eyebrow">Filtros</p>
+      <h2>Buscar reservas</h2>
+      <p>Filtrá por fecha, cancha, cliente o teléfono.</p>
+    </div>
 
-      <div class="sidebar-footer">
-        
-        <a class="admin-logout" href="{{ url_for('logout_admin') }}">Cerrar sesión</a>
-      </div>
-    </aside>
+    <span class="st-counter">
+      {{ resumen_agenda.resultados | default(0) }} resultados
+    </span>
+  </div>
 
-    <!-- MAIN -->
-    <main class="admin-main">
-<!-- MOBILE NAV -->
-<div class="admin-mobile-nav">
-  <a class="admin-mobile-link" href="{{ url_for('admin') }}">Operación</a>
-  <a class="admin-mobile-link active" href="{{ url_for('admin_agenda') }}">Calendario</a>
-  <a class="admin-mobile-link" href="{{ url_for('admin_retos') }}">Retos</a>
-  <a class="admin-mobile-link" href="{{ url_for('admin_historial') }}">Reportes</a>
-</div>
-      <!-- TOPBAR -->
-      <div class="admin-topbar">
-        <div class="search">
-          🔎 <input type="text" placeholder="Buscar… (visual)" />
-        </div>
+  <form method="GET" action="{{ url_for('admin_agenda') }}" class="st-filter-grid">
+    <div class="st-field">
+      <label>Fecha</label>
+      <input type="date" name="fecha" value="{{ fecha_filtro }}">
+    </div>
 
-        <div class="top-actions">
-          <div class="icon-btn">🔔</div>
-          <div class="icon-btn">💬</div>
+    <div class="st-field">
+      <label>Cancha</label>
+      <select name="cancha_id">
+        <option value="">Todas las canchas</option>
+        {% for c in canchas %}
+          <option value="{{ c.id }}" {% if cancha_filtro|string == c.id|string %}selected{% endif %}>
+            {{ c.nombre }} · {{ c.tipo }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
 
-          <div class="user-pill">
-            <div class="user-avatar">{{ (admin_usuario[:1] if admin_usuario else 'A')|upper }}</div>
-            <div class="user-meta">
-              <div class="u">{{ admin_usuario }}</div>
-              <div class="r">Administrador</div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="st-field st-field-wide">
+      <label>Búsqueda</label>
+      <input type="text" name="q" value="{{ busqueda }}" placeholder="Ej: Ethan o 7231">
+    </div>
 
-      <div class="page-head">
-        <h1>Agenda y <span class="accent">Gestión</span></h1>
-        <p>Reservas futuras, pendientes de pago y vista general filtrada</p>
-      </div>
+    <div class="st-filter-actions">
+      <button class="st-btn st-btn-primary" type="submit">
+        Aplicar filtros
+      </button>
 
-      <!-- KPIs -->
-      <div class="kpis">
-        <div class="kpi orange">
-          <div>
-            <div class="lbl">Pendientes</div>
-            <div class="val">{{ resumen_agenda.pendientes_total | default(0) }}</div>
-          </div>
-          <div class="pill warn">!</div>
-        </div>
+      <a class="st-btn st-btn-light" href="{{ url_for('admin_agenda') }}">
+        Limpiar
+      </a>
+    </div>
+  </form>
+</section>
 
-        <div class="kpi blue">
-          <div>
-            <div class="lbl">SINPE pendientes</div>
-            <div class="val">{{ resumen_agenda.pendientes_sinpe | default(0) }}</div>
-          </div>
-          <div class="pill blue">●</div>
-        </div>
 
-        <div class="kpi red">
-          <div>
-            <div class="lbl">SINPE reportado</div>
-            <div class="val">{{ resumen_agenda.sinpe_reportado | default(0) }}</div>
-          </div>
-          <div class="pill bad">×</div>
-        </div>
+<section class="st-panel">
+  <div class="st-panel-head">
+    <div>
+      <p class="st-eyebrow">Pagos</p>
+      <h2>Pendientes por gestionar</h2>
+      <p>Reservas activas que todavía no tienen pago confirmado.</p>
+    </div>
+  </div>
 
-        <div class="kpi green">
-          <div>
-            <div class="lbl">Futuras activas</div>
-            <div class="val">{{ resumen_agenda.futuras_total | default(0) }}</div>
-          </div>
-          <div class="pill ok">✓</div>
-        </div>
-      </div>
+  <div class="st-table-wrap">
+    <table class="st-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Fecha</th>
+          <th>Hora</th>
+          <th>Cliente</th>
+          <th>Teléfono</th>
+          <th>Cancha</th>
+          <th>Método</th>
+          <th>Pago</th>
+          <th>Monto</th>
+          <th class="st-actions-col">Acciones</th>
+        </tr>
+      </thead>
 
-      {% if aviso %}
-        <div class="alert success">{{ aviso }}</div>
-      {% endif %}
+      <tbody>
+        {% if pendientes_gestion %}
+          {% for r in pendientes_gestion %}
+            <tr>
+              <td class="st-id">#{{ r.id }}</td>
+              <td>{{ r.fecha | fecha_latina }}</td>
+              <td><strong>{{ r.hora }}</strong></td>
+              <td>
+                <div class="st-client">
+                  <strong>{{ r.nombre }}</strong>
+                  <span>{{ r.cancha_tipo }}</span>
+                </div>
+              </td>
+              <td>{{ r.telefono }}</td>
+              <td>{{ r.cancha_nombre }}</td>
+              <td>{{ r.metodo_pago }}</td>
+              <td>
+                {% if r.metodo_pago == "SINPE" and r.sinpe_reportado_cliente %}
+                  <span class="st-badge st-badge-warning">SINPE reportado</span>
+                {% else %}
+                  <span class="st-badge st-badge-danger">Pendiente</span>
+                {% endif %}
+              </td>
+              <td><strong>{{ r.monto | colones }}</strong></td>
+              <td>
+                <div class="st-actions">
+                  {% if r.metodo_pago == "SINPE" %}
+                    {% if r.sinpe_reportado_cliente %}
+                      <a class="st-btn st-btn-light st-btn-sm" href="{{ url_for('desmarcar_sinpe_reportado_admin', reserva_id=r.id, fecha=fecha_filtro, cancha_id=cancha_filtro, q=busqueda) }}">
+                        Quitar SINPE
+                      </a>
+                    {% else %}
+                      <a class="st-btn st-btn-warning st-btn-sm" href="{{ url_for('marcar_sinpe_reportado_admin', reserva_id=r.id, fecha=fecha_filtro, cancha_id=cancha_filtro, q=busqueda) }}">
+                        Marcar SINPE
+                      </a>
+                    {% endif %}
+                  {% endif %}
 
-      <!-- Filtros -->
-      <div class="admin-card">
-        <div class="title-row">
-          <h2>🔎 Filtros</h2>
-          <span class="pill blue">Resultados: {{ resumen_agenda.resultados | default(0) }}</span>
-        </div>
+                  <a class="st-btn st-btn-primary st-btn-sm" href="{{ url_for('confirmar_pago_admin', reserva_id=r.id, volver_a='admin_agenda', fecha=fecha_filtro, cancha_id=cancha_filtro, q=busqueda) }}">
+                    Confirmar
+                  </a>
 
-        <form method="GET" action="{{ url_for('admin_agenda') }}" class="form-grid">
-          <div>
-            <label>Fecha</label>
-            <input type="date" name="fecha" value="{{ fecha_filtro }}">
-          </div>
-
-          <div>
-            <label>Cancha</label>
-            <select name="cancha_id">
-              <option value="">Todas las canchas</option>
-              {% for c in canchas %}
-                <option value="{{ c.id }}" {% if cancha_filtro|string == c.id|string %}selected{% endif %}>
-                  {{ c.nombre }} · {{ c.tipo }}
-                </option>
-              {% endfor %}
-            </select>
-          </div>
-
-          <div class="full">
-            <label>Búsqueda (cliente o teléfono)</label>
-            <input type="text" name="q" value="{{ busqueda }}" placeholder="Ej: Marta o 8888">
-          </div>
-
-          <div class="full btn-row">
-            <button class="btn primary" type="submit">Aplicar filtros</button>
-            <a class="btn ghost" href="{{ url_for('admin_agenda') }}">Limpiar</a>
-          </div>
-        </form>
-      </div>
-
-      <!-- Pendientes -->
-      <div class="admin-card">
-        <div class="title-row">
-          <h2>🧾 Pendientes por gestionar (pagos)</h2>
-        </div>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Fecha</th>
-                <th>Hora</th>
-                <th>Cliente</th>
-                <th>Teléfono</th>
-                <th>Cancha</th>
-                <th>Tipo</th>
-                <th>Método</th>
-                <th>Pago</th>
-                <th>Monto</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {% if pendientes_gestion %}
-                {% for r in pendientes_gestion %}
-                  <tr>
-                    <td>{{ r.id }}</td>
-                    <td>{{ r.fecha | fecha_latina }}</td>
-                    <td>{{ r.hora }}</td>
-                    <td>{{ r.nombre }}</td>
-                    <td>{{ r.telefono }}</td>
-                    <td>{{ r.cancha_nombre }}</td>
-                    <td>{{ r.cancha_tipo }}</td>
-                    <td>{{ r.metodo_pago }}</td>
-                    <td>
-                      {% if r.metodo_pago == "SINPE" and r.sinpe_reportado_cliente %}
-                        <span class="pill warn">SINPE reportado</span>
-                      {% else %}
-                        <span class="pill bad">Pendiente</span>
-                      {% endif %}
-                    </td>
-                    <td>{{ r.monto | colones }}</td>
-                    <td>
-                      <div class="actions">
-                        {% if r.metodo_pago == "SINPE" %}
-                          {% if r.sinpe_reportado_cliente %}
-                            <a class="btn ghost" href="{{ url_for('desmarcar_sinpe_reportado_admin', reserva_id=r.id, fecha=fecha_filtro, cancha_id=cancha_filtro, q=busqueda) }}">
-                              ↩️ Quitar SINPE
-                            </a>
-                          {% else %}
-                            <a class="btn ghost" href="{{ url_for('marcar_sinpe_reportado_admin', reserva_id=r.id, fecha=fecha_filtro, cancha_id=cancha_filtro, q=busqueda) }}">
-                              🟡 Marcar SINPE
-                            </a>
-                          {% endif %}
-                        {% endif %}
-
-                        <a class="btn primary" href="{{ url_for('confirmar_pago_admin', reserva_id=r.id, volver_a='admin_agenda', fecha=fecha_filtro, cancha_id=cancha_filtro, q=busqueda) }}">
-  ✅ Confirmar pago
-</a>
-
-<a
-  class="btn ghost"
-  href="{{ url_for('admin_cancelar_reserva', reserva_id=r.id, volver_a='admin_agenda', fecha=fecha_filtro, cancha_id=cancha_filtro, q=busqueda) }}"
-  onclick="return confirm('¿Seguro que quieres cancelar esta reserva?');"
->
-  ❌ Cancelar
-</a>
-                      </div>
-                    </td>
-                  </tr>
-                {% endfor %}
-              {% else %}
-                <tr><td colspan="11">No hay pendientes con los filtros actuales.</td></tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Futuras -->
-      <div class="admin-card">
-        <div class="title-row">
-          <h2>⏭️ Próximas reservas (futuras)</h2>
-        </div>
-
-        {% if futuras_por_fecha %}
-          {% for fecha, lista in futuras_por_fecha.items() %}
-            <div class="admin-card" style="margin-bottom:12px;">
-              <div class="title-row">
-                <h2>📌 {{ fecha | fecha_latina }}</h2>
-                <span class="pill blue">{{ lista|length }} reservas</span>
-              </div>
-
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Hora</th>
-                      <th>Cliente</th>
-                      <th>Teléfono</th>
-                      <th>Cancha</th>
-                      <th>Tipo</th>
-                      <th>Método</th>
-                      <th>Pago</th>
-                      <th>Monto</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for r in lista %}
-                      <tr>
-                        <td>{{ r.hora }}</td>
-                        <td>{{ r.nombre }}</td>
-                        <td>{{ r.telefono }}</td>
-                        <td>{{ r.cancha_nombre }}</td>
-                        <td>{{ r.cancha_tipo }}</td>
-                        <td>{{ r.metodo_pago or "No indicado" }}</td>
-                        <td>
-                          {% if r.pagado %}
-                            <span class="pill ok">Pagado</span>
-                          {% elif r.metodo_pago == "SINPE" and r.sinpe_reportado_cliente %}
-                            <span class="pill warn">SINPE reportado</span>
-                          {% else %}
-                            <span class="pill bad">Pendiente</span>
-                          {% endif %}
-                        </td>
-                        <td>{{ r.monto | colones }}</td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                  <a
+                    class="st-btn st-btn-danger st-btn-sm"
+                    href="{{ url_for('admin_cancelar_reserva', reserva_id=r.id, volver_a='admin_agenda', fecha=fecha_filtro, cancha_id=cancha_filtro, q=busqueda) }}"
+                    onclick="return confirm('¿Seguro que quieres cancelar esta reserva?');"
+                  >
+                    Cancelar
+                  </a>
+                </div>
+              </td>
+            </tr>
           {% endfor %}
         {% else %}
-          <div class="alert">No hay reservas futuras activas con los filtros actuales.</div>
+          <tr>
+            <td colspan="10">
+              <div class="st-empty">
+                No hay pendientes con los filtros actuales.
+              </div>
+            </td>
+          </tr>
         {% endif %}
-    </main>
+      </tbody>
+    </table>
   </div>
-</body>
-</html>
+</section>
+
+
+<section class="st-panel">
+  <div class="st-panel-head">
+    <div>
+      <p class="st-eyebrow">Próximas</p>
+      <h2>Reservas futuras</h2>
+      <p>Reservas activas organizadas por fecha.</p>
+    </div>
+  </div>
+
+  {% if futuras_por_fecha %}
+    <div class="st-future-list">
+      {% for fecha, lista in futuras_por_fecha.items() %}
+        <article class="st-day-card">
+          <div class="st-day-head">
+            <h3>{{ fecha | fecha_latina }}</h3>
+            <span class="st-counter">{{ lista|length }} reservas</span>
+          </div>
+
+          <div class="st-table-wrap">
+            <table class="st-table st-table-compact">
+              <thead>
+                <tr>
+                  <th>Hora</th>
+                  <th>Cliente</th>
+                  <th>Teléfono</th>
+                  <th>Cancha</th>
+                  <th>Método</th>
+                  <th>Pago</th>
+                  <th>Monto</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {% for r in lista %}
+                  <tr>
+                    <td><strong>{{ r.hora }}</strong></td>
+                    <td>{{ r.nombre }}</td>
+                    <td>{{ r.telefono }}</td>
+                    <td>{{ r.cancha_nombre }} · {{ r.cancha_tipo }}</td>
+                    <td>{{ r.metodo_pago or "No indicado" }}</td>
+                    <td>
+                      {% if r.pagado %}
+                        <span class="st-badge st-badge-ok">Pagado</span>
+                      {% elif r.metodo_pago == "SINPE" and r.sinpe_reportado_cliente %}
+                        <span class="st-badge st-badge-warning">SINPE reportado</span>
+                      {% else %}
+                        <span class="st-badge st-badge-danger">Pendiente</span>
+                      {% endif %}
+                    </td>
+                    <td><strong>{{ r.monto | colones }}</strong></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="st-empty">
+      No hay reservas futuras activas con los filtros actuales.
+    </div>
+  {% endif %}
+</section>
+
+{% endblock %}
