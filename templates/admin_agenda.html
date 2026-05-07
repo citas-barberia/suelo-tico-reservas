@@ -197,13 +197,17 @@
                           {% endif %}
                         {% endif %}
 
-                        {% if r.fecha == hoy_real_iso %}
-                          <a class="btn primary" href="{{ url_for('confirmar_pago_admin', reserva_id=r.id, volver_a='admin_agenda', fecha=fecha_filtro, cancha_id=cancha_filtro, q=busqueda) }}">
-                            ✅ Confirmar pago
-                          </a>
-                        {% else %}
-                          <span class="pill">⏳ Esperar fecha</span>
-                        {% endif %}
+                        <a class="btn primary" href="{{ url_for('confirmar_pago_admin', reserva_id=r.id, volver_a='admin_agenda', fecha=fecha_filtro, cancha_id=cancha_filtro, q=busqueda) }}">
+  ✅ Confirmar pago
+</a>
+
+<a
+  class="btn ghost"
+  href="{{ url_for('admin_cancelar_reserva', reserva_id=r.id, volver_a='admin_agenda', fecha=fecha_filtro, cancha_id=cancha_filtro, q=busqueda) }}"
+  onclick="return confirm('¿Seguro que quieres cancelar esta reserva?');"
+>
+  ❌ Cancelar
+</a>
                       </div>
                     </td>
                   </tr>

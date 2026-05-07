@@ -1531,22 +1531,57 @@ def confirmar_pago_admin(reserva_id):
         elif reserva_actual.get("pagado") is True:
             aviso = "Ese pago ya estaba confirmado."
         else:
-            if reserva_actual.get("fecha") != hoy_cr_iso():
-                aviso = "El pago solo se puede confirmar el mismo día de la reserva."
-            else:
-                reserva_actualizada = actualizar_reserva(
-                    reserva_id,
-                    {
-                        "pagado": True,
-                        "fecha_pago_confirmado": ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
-                    }
-                )
-                aviso = "Pago confirmado correctamente."
+            reserva_actualizada = actualizar_reserva(
+                reserva_id,
+                {
+                    "pagado": True,
+                    "fecha_pago_confirmado": ahora_cr().strftime("%Y-%m-%d %H:%M:%S")
+                }
+            )
+            aviso = "Pago confirmado correctamente."
 
     if reserva_actualizada:
         registrar_evento("pago_confirmado", reserva_actualizada)
 
     volver_a = request.args.get("volver_a", "").strip()
+    if volver_a == "admin_agenda":
+        return redirect(url_for(
+            "admin_agenda",
+            aviso=aviso,
+            fecha=request.args.get("fecha", "").strip(),
+            cancha_id=request.args.get("cancha_id", "").strip(),
+            q=request.args.get("q", "").strip()
+        ))
+
+    return redirect(url_for("admin", aviso=aviso))
+
+@app.route("/admin_cancelar_reserva/<int:reserva_id>")
+def admin_cancelar_reserva(reserva_id):
+    if not admin_requerido():
+        return redirect(url_for("login_admin"))
+
+    reservas = leer_reservas()
+    reserva_actual = next((r for r in reservas if int(r.get("id", 0)) == reserva_id), None)
+    aviso = "No se encontró la reserva."
+
+    if reserva_actual:
+        if reserva_actual.get("estado") == "Cancelada":
+            aviso = "La reserva ya estaba cancelada."
+        else:
+            reserva_actualizada = actualizar_reserva(
+                reserva_id,
+                {
+                    "estado": "Cancelada",
+                    "pagado": False
+                }
+            )
+
+            if reserva_actualizada:
+                registrar_evento("cancelacion", reserva_actualizada)
+                aviso = "Reserva cancelada correctamente."
+
+    volver_a = request.args.get("volver_a", "").strip()
+
     if volver_a == "admin_agenda":
         return redirect(url_for(
             "admin_agenda",

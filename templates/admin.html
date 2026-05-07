@@ -130,14 +130,22 @@
                       {% endif %}
                     </td>
                     <td data-label="Acción">
-                      {% if not r.pagado %}
-                        <a class="btn primary" href="{{ url_for('confirmar_pago_admin', reserva_id=r.id) }}">
-                          Confirmar pago
-                        </a>
-                      {% else %}
-                        <span class="txt-ok">✓ Completado</span>
-                      {% endif %}
-                    </td>
+  {% if not r.pagado %}
+    <a class="btn primary" href="{{ url_for('confirmar_pago_admin', reserva_id=r.id) }}">
+      Confirmar pago
+    </a>
+  {% else %}
+    <span class="txt-ok">✓ Completado</span>
+  {% endif %}
+
+  <a
+    class="btn ghost"
+    href="{{ url_for('admin_cancelar_reserva', reserva_id=r.id) }}"
+    onclick="return confirm('¿Seguro que quieres cancelar esta reserva?');"
+  >
+    Cancelar
+  </a>
+</td>
                   </tr>
                 {% endfor %}
               {% else %}
