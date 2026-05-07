@@ -178,17 +178,22 @@ def insertar_reserva(reserva_data):
         "estado": reserva_data.get("estado", "Reservada"),
         "fecha_creacion": reserva_data.get("fecha_creacion"),
         "origen": reserva_data.get("origen", "Reserva"),
-        "nota_reto": reserva_data.get("nota_reto", ""),
-        "reto_id": reserva_data.get("reto_id"),
-        "fecha_pago_confirmado": reserva_data.get("fecha_pago_confirmado"),
-        "fecha_sinpe_reportado": reserva_data.get("fecha_sinpe_reportado"),
+        "nota_reto": reserva_data.get("nota_reto", "")
     }
 
     if supabase_activo():
-        creada = sb_insert("reservas", payload)
-        if creada:
-            return creada
-        raise Exception("No se pudo insertar la reserva en Supabase.")
+        try:
+            resp = supabase.table("reservas").insert(payload).execute()
+
+            if resp.data:
+                return resp.data[0]
+
+            print("Supabase no devolvió datos al insertar reserva.")
+            return None
+
+        except Exception as e:
+            print("ERROR INSERTANDO RESERVA EN SUPABASE:", e)
+            return None
 
     reservas = leer_json_lista(ARCHIVO_RESERVAS)
     reserva_data["id"] = siguiente_id(reservas)
@@ -738,6 +743,7 @@ def fecha_larga_filter(fecha_iso):
 # ==========================
 # CLIENTE: RESERVAS
 # ==========================
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     mensaje = ""
@@ -747,7 +753,10 @@ def index():
     fecha_sel = request.form.get("fecha", fecha_hoy_iso()) if request.method == "POST" else fecha_hoy_iso()
     cancha_sel = request.form.get("cancha_id", "") if request.method == "POST" else ""
 
-    horas_disponibles = obtener_horas_disponibles(fecha_sel, cancha_sel) if cancha_sel else obtener_horas_disponibles(fecha_sel, "")
+    if cancha_sel:
+        horas_disponibles = obtener_horas_disponibles(fecha_sel, cancha_sel)
+    else:
+        horas_disponibles = obtener_horas_disponibles(fecha_sel, "")
 
     whatsapp_link = ""
     wa_confirm_link = ""
@@ -761,31 +770,41 @@ def index():
         hora = request.form.get("hora", "").strip().lower()
         metodo_pago = request.form.get("metodo_pago", "").strip()
 
-        horas_disponibles = obtener_horas_disponibles(fecha, cancha_id) if cancha_id else obtener_horas_disponibles(fecha, "")
         fecha_sel = fecha
         cancha_sel = cancha_id
+
+        if cancha_id:
+            horas_disponibles = obtener_horas_disponibles(fecha, cancha_id)
+        else:
+            horas_disponibles = obtener_horas_disponibles(fecha, "")
 
         if not nombre or not telefono or not fecha or not cancha_id or not hora or not metodo_pago:
             mensaje = "Por favor completa todos los campos."
             tipo_mensaje = "error"
+
         elif es_fecha_pasada(fecha):
             mensaje = "No puedes reservar una cancha en una fecha pasada."
             tipo_mensaje = "error"
+
         elif hora not in [h.lower() for h in HORARIOS]:
             mensaje = "La hora seleccionada no es válida."
             tipo_mensaje = "error"
+
         elif hora_ya_paso_para_hoy(fecha, hora):
             mensaje = "Esa hora ya pasó para hoy."
             tipo_mensaje = "error"
+
         elif horario_ocupado(fecha, cancha_id, hora):
-            mensaje = "Esa hora ya está ocupada (por reserva o por reto)."
+            mensaje = "Esa hora ya está ocupada. Elige otra hora."
             tipo_mensaje = "error"
+
         else:
-            cancha_info = next((c for c in CANCHAS if c["id"] == int(cancha_id)), None)
+            cancha_info = next((c for c in CANCHAS if int(c["id"]) == int(cancha_id)), None)
 
             if not cancha_info:
                 mensaje = "La cancha seleccionada no es válida."
                 tipo_mensaje = "error"
+
             else:
                 monto = obtener_precio_por_hora(hora)
 
@@ -803,38 +822,54 @@ def index():
                     "sinpe_reportado_cliente": False,
                     "estado": "Reservada",
                     "fecha_creacion": ahora_cr().strftime("%Y-%m-%d %H:%M:%S"),
-                    "origen": "Reserva"
+                    "origen": "Reserva",
+                    "nota_reto": ""
                 }
 
-                reserva_creada = insertar_reserva(nueva)
-                registrar_evento("reserva", reserva_creada)
+                try:
+                    reserva_creada = insertar_reserva(nueva)
 
-                mensaje = f"Reserva confirmada. {cancha_info['nombre']} el {formatear_fecha_latina(fecha)} a las {hora}. Monto: {colones_filter(monto)}"
-                tipo_mensaje = "success"
+                    if not reserva_creada:
+                        mensaje = "No se pudo guardar la reserva. Revisa la base de datos o intenta de nuevo."
+                        tipo_mensaje = "error"
 
-                msg_wa = (
-                    "✅ Reserva confirmada\n"
-                    f"Cancha Suelo Tico: {cancha_info['nombre']} ({cancha_info['tipo']})\n"
-                    f"Fecha: {fecha_larga_filter(fecha)}\n"
-                    f"Hora: {hora}\n"
-                    f"Monto: {colones_filter(monto)}\n\n"
-                    "Si cancelas avisa con tiempo. Solo vuelve a ingresar al link y le das click al botón de cancelar.\n\n"
-                    "Gracias por elegirnos."
-                )
-                whatsapp_link = wa_link(telefono, msg_wa)
+                    else:
+                        registrar_evento("reserva", reserva_creada)
 
-                texto_confirm = (
-                    "✅ Reserva confirmada\n"
-                    f"Cancha: {reserva_creada.get('cancha_nombre')} ({reserva_creada.get('cancha_tipo')})\n"
-                    f"Fecha: {fecha_larga_filter(reserva_creada.get('fecha'))}\n"
-                    f"Hora: {reserva_creada.get('hora')}\n"
-                    f"Monto: {colones_filter(reserva_creada.get('monto'))}\n\n"
-                    "Si cancelas avisa con tiempo. Solo vuelve a ingresar al link y le das click al botón de cancelar.\n\n"
-                    "Gracias por elegirnos."
-                )
-                wa_confirm_link = f"https://wa.me/{DUENO_TELEFONO}?text={quote_plus(texto_confirm)}"
+                        mensaje = f"Reserva confirmada. {cancha_info['nombre']} el {formatear_fecha_latina(fecha)} a las {hora}. Monto: {colones_filter(monto)}"
+                        tipo_mensaje = "success"
 
-                horas_disponibles = obtener_horas_disponibles(fecha, cancha_id)
+                        msg_wa = (
+                            "✅ Reserva confirmada\n"
+                            f"Cancha Suelo Tico: {cancha_info['nombre']} ({cancha_info['tipo']})\n"
+                            f"Fecha: {fecha_larga_filter(fecha)}\n"
+                            f"Hora: {hora}\n"
+                            f"Monto: {colones_filter(monto)}\n\n"
+                            "Si cancelas, avisa con tiempo.\n\n"
+                            "Gracias por elegirnos."
+                        )
+
+                        whatsapp_link = wa_link(telefono, msg_wa)
+
+                        texto_confirm = (
+                            "✅ Reserva confirmada\n"
+                            f"Cancha: {reserva_creada.get('cancha_nombre')} ({reserva_creada.get('cancha_tipo')})\n"
+                            f"Fecha: {fecha_larga_filter(reserva_creada.get('fecha'))}\n"
+                            f"Hora: {reserva_creada.get('hora')}\n"
+                            f"Monto: {colones_filter(reserva_creada.get('monto'))}\n\n"
+                            "Si cancelas, avisa con tiempo.\n\n"
+                            "Gracias por elegirnos."
+                        )
+
+                        wa_confirm_link = f"https://wa.me/{DUENO_TELEFONO}?text={quote_plus(texto_confirm)}"
+
+                        horas_disponibles = obtener_horas_disponibles(fecha, cancha_id)
+
+                except Exception as e:
+                    print("ERROR CREANDO RESERVA:", e)
+                    mensaje = "Ocurrió un error creando la reserva. Revisa los logs de Render."
+                    tipo_mensaje = "error"
+                    reserva_creada = None
 
     return render_template(
         "index.html",
@@ -853,7 +888,6 @@ def index():
         wa_confirm_link=wa_confirm_link if reserva_creada else "",
         wa_confirm_text=texto_confirm if reserva_creada else ""
     )
-
 
 @app.route("/horarios_disponibles")
 def horarios_disponibles_api():
